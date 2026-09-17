@@ -4,7 +4,7 @@ from pyedookit import auth
 from pyedookit.exceptions import AuthError
 from pyedookit.session import Session
 
-from .fakes import FakeClientSession, ok, prefix, redirect, rejected
+from .fakes import FakeClientSession, ok, redirect, rejected
 
 SCHOOL = "zs-example"
 AUTH_URL_PREFIX = (
@@ -31,17 +31,17 @@ async def test_login_success_extracts_edookit_and_plus4u_cookies(monkeypatch):
     _install_fake_session(
         monkeypatch,
         [
-            ("GET", prefix(AUTH_URL_PREFIX), redirect(LOGIN_PAGE_URL)),
+            ("GET", AUTH_URL_PREFIX, redirect(LOGIN_PAGE_URL)),
             (
                 "POST",
-                prefix(PASSWORD_URL),
+                PASSWORD_URL,
                 redirect(CONTINUE_URL, set_cookies={"uoid.ps": "p", "uoid.s": "s", "uoid.bs": "b"}),
             ),
-            ("GET", prefix(CONTINUE_URL), redirect(f"{CALLBACK_URL}?code=abc123")),
-            ("GET", prefix(CALLBACK_URL), redirect(DASHBOARD_URL)),
+            ("GET", CONTINUE_URL, redirect(f"{CALLBACK_URL}?code=abc123")),
+            ("GET", CALLBACK_URL, redirect(DASHBOARD_URL)),
             (
                 "GET",
-                prefix(DASHBOARD_URL),
+                DASHBOARD_URL,
                 ok(
                     DASHBOARD_URL,
                     set_cookies={
@@ -69,8 +69,8 @@ async def test_login_raises_auth_error_on_bad_credentials(monkeypatch):
     _install_fake_session(
         monkeypatch,
         [
-            ("GET", prefix(AUTH_URL_PREFIX), redirect(LOGIN_PAGE_URL)),
-            ("POST", prefix(PASSWORD_URL), rejected(401)),
+            ("GET", AUTH_URL_PREFIX, redirect(LOGIN_PAGE_URL)),
+            ("POST", PASSWORD_URL, rejected(401)),
         ],
     )
 
@@ -89,11 +89,11 @@ async def test_refresh_success_reuses_plus4u_cookies_without_password(monkeypatc
     _install_fake_session(
         monkeypatch,
         [
-            ("GET", prefix(AUTH_URL_PREFIX), redirect(f"{CALLBACK_URL}?code=fresh123")),
-            ("GET", prefix(CALLBACK_URL), redirect(DASHBOARD_URL)),
+            ("GET", AUTH_URL_PREFIX, redirect(f"{CALLBACK_URL}?code=fresh123")),
+            ("GET", CALLBACK_URL, redirect(DASHBOARD_URL)),
             (
                 "GET",
-                prefix(DASHBOARD_URL),
+                DASHBOARD_URL,
                 ok(
                     DASHBOARD_URL,
                     set_cookies={
@@ -125,9 +125,23 @@ async def test_refresh_raises_auth_error_when_plus4u_cookie_expired(monkeypatch)
     _install_fake_session(
         monkeypatch,
         [
-            ("GET", prefix(AUTH_URL_PREFIX), redirect(LOGIN_PAGE_URL)),
+            ("GET", AUTH_URL_PREFIX, redirect(LOGIN_PAGE_URL)),
         ],
     )
 
     with pytest.raises(AuthError):
         await auth.refresh(stale)
+
+
+@pytest.mark.asyncio
+async def test_login_rejects_malformed_school_without_making_a_request(monkeypatch):
+    _install_fake_session(monkeypatch, [])  # any request would raise AssertionError
+
+    with pytest.raises(AuthError):
+        await auth.login("evil.com/", "user@example.com", "hunter2")
+
+
+def test_is_login_url():
+    assert auth.is_login_url(f"https://{SCHOOL}.edookit.net/user/login")
+    assert auth.is_login_url(f"https://{SCHOOL}.edookit.net/user/oidc?x=1")
+    assert not auth.is_login_url(f"https://{SCHOOL}.edookit.net/overview/updates")

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 
 
@@ -27,9 +27,3 @@ class Term:
 class Student:
     id: str
     name: str
-
-
-@dataclass(slots=True)
-class Timetable:
-    week_offset: int
-    lessons: list[Lesson] = field(default_factory=list)

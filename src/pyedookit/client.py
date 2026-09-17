@@ -11,7 +11,6 @@ from .parsers.timetable import parse_terms, parse_timetable
 from .session import Session
 
 _TIMETABLE_PATH = "/timetable/"
-_LOGIN_MARKERS = ("/user/login", "/user/oidc")
 
 
 class EdookitClient:
@@ -21,34 +20,57 @@ class EdookitClient:
     refreshing (see `pyedookit.auth.refresh`); this class only detects when
     the current session has gone stale and raises `SessionExpired` so the
     caller can refresh and retry.
+
+    Pass `http` to reuse an existing `aiohttp.ClientSession` (e.g. Home
+    Assistant's shared session) across requests instead of opening a new
+    connection per call; otherwise one is created and closed per request.
     """
 
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, http: aiohttp.ClientSession | None = None) -> None:
         self._session = session
+        self._http = http
 
     @property
     def session(self) -> Session:
         return self._session
 
     async def get_terms(self) -> list[Term]:
-        html = await self._get(_TIMETABLE_PATH)
+        html = await self.fetch_timetable_html()
         return parse_terms(html)
 
     async def get_timetable(self, week_offset: int = 0) -> list[Lesson]:
-        html = await self._get(_TIMETABLE_PATH, params={"familyTimetable-value": week_offset})
+        html = await self.fetch_timetable_html(week_offset)
         return parse_timetable(html, week_start=_week_start(week_offset))
 
+    async def fetch_timetable_html(self, week_offset: int = 0) -> str:
+        """Raw `/timetable/` HTML for one week - also used by
+        scripts/capture_fixtures.py, so the request shape lives in one place."""
+        return await self._get(_TIMETABLE_PATH, params={"familyTimetable-value": week_offset})
+
     async def _get(self, path: str, params: dict[str, int] | None = None) -> str:
-        base = f"https://{self._session.school}.edookit.net"
+        url = f"{self._session.base_url}{path}"
         headers = auth.build_headers(self._session)
+        if self._http is not None:
+            return await self._request(self._http, url, params, headers)
         async with aiohttp.ClientSession() as http:
-            async with http.get(
-                f"{base}{path}", params=params, headers=headers, allow_redirects=True
-            ) as resp:
-                final_url = str(resp.url)
-                if any(marker in final_url for marker in _LOGIN_MARKERS):
-                    raise SessionExpired("edookit session has expired")
-                return await resp.text()
+            return await self._request(http, url, params, headers)
+
+    async def _request(
+        self,
+        http: aiohttp.ClientSession,
+        url: str,
+        params: dict[str, int] | None,
+        headers: dict[str, str],
+    ) -> str:
+        # allow_redirects=False: our Cookie/CSRF headers are set manually, and
+        # older aiohttp forwards a manually-set Cookie header to a redirect's
+        # target even when that target is a different host - so an expired
+        # session's redirect to Plus4U must never be followed with them
+        # attached. Any redirect at all means the session isn't good anymore.
+        async with http.get(url, params=params, headers=headers, allow_redirects=False) as resp:
+            if resp.status in auth.REDIRECT_STATUSES or auth.is_login_url(str(resp.url)):
+                raise SessionExpired("edookit session has expired")
+            return await resp.text()
 
 
 def _week_start(week_offset: int) -> date:

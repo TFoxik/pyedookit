@@ -73,6 +73,11 @@ def _extract_day_date(column: Tag, week_start: date | None) -> date | None:
     return None
 
 
+def _text(tag: Tag, selector: str) -> str | None:
+    el = tag.select_one(selector)
+    return el.get_text(strip=True) if el else None
+
+
 def _parse_entry(entry: Tag, day_date: date | None) -> Lesson | None:
     text = entry.get_text(" ", strip=True)
     time_match = _TIME_RANGE_RE.search(text)
@@ -80,12 +85,7 @@ def _parse_entry(entry: Tag, day_date: date | None) -> Lesson | None:
         return None
     sh, sm, eh, em = (int(g) for g in time_match.groups())
 
-    subject_el = entry.select_one(".subject, .lesson-subject, .name")
-    subject = subject_el.get_text(strip=True) if subject_el else text
-
-    teacher_el = entry.select_one(".teacher, .lesson-teacher")
-    room_el = entry.select_one(".room, .lesson-room")
-    group_el = entry.select_one(".group, .lesson-group")
+    subject = _text(entry, ".subject, .lesson-subject, .name") or text
 
     classes = [c.lower() for c in entry.get_attribute_list("class")]
     is_cancelled = any("cancel" in c or "zrus" in c for c in classes)
@@ -95,9 +95,9 @@ def _parse_entry(entry: Tag, day_date: date | None) -> Lesson | None:
         start=datetime.combine(day_date, time(sh, sm)),
         end=datetime.combine(day_date, time(eh, em)),
         subject=subject,
-        teacher=teacher_el.get_text(strip=True) if teacher_el else None,
-        room=room_el.get_text(strip=True) if room_el else None,
-        group=group_el.get_text(strip=True) if group_el else None,
+        teacher=_text(entry, ".teacher, .lesson-teacher"),
+        room=_text(entry, ".room, .lesson-room"),
+        group=_text(entry, ".group, .lesson-group"),
         is_changed=is_changed,
         is_cancelled=is_cancelled,
     )

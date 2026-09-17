@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import json as _json
+import re
 import secrets
 from collections.abc import Mapping
 from dataclasses import dataclass
-from http.cookies import SimpleCookie
 
 import aiohttp
 from yarl import URL
@@ -21,12 +21,29 @@ _REALM_CODE = "uuIdentityPasswordAuthNRealm"
 
 # Observed on one school's login redirect. Edookit apps may all share a single
 # Plus4U OIDC client, but this hasn't been confirmed across schools yet -
-# `scripts/capture_fixtures.py` prints the value it sees so it can be verified
-# or made configurable per school if it turns out to differ.
-_CLIENT_ID = "0fa24fa43e794de89003790253a93cb6"
+# `probe_client_id()` / `scripts/capture_fixtures.py` check the value seen on
+# a real portal against this one.
+CLIENT_ID = "0fa24fa43e794de89003790253a93cb6"
 
 _PLUS4U_HOST = "uuidentity.plus4u.net"
 _MAX_REDIRECTS = 5
+
+# A school subdomain becomes part of a URL (redirect_uri, portal base) with
+# no other encoding, so reject anything that isn't a bare hostname label -
+# otherwise a value like "evil.com/" would redirect the OIDC flow off-portal.
+_SCHOOL_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,62}$")
+
+REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
+
+# Edookit sends the browser back to one of these paths when a session has
+# expired or was never valid; shared with client.py so "did we get logged
+# out" is checked the same way everywhere.
+LOGIN_MARKERS = ("/user/login", "/user/oidc")
+
+
+def is_login_url(url: str) -> bool:
+    return any(marker in url for marker in LOGIN_MARKERS)
+
 
 # Cookies are tracked per host explicitly rather than via aiohttp's
 # CookieJar: the login flow hops between the plus4u.net and edookit.net
@@ -42,6 +59,12 @@ class _FetchResult:
     url: str
     text: str
     location: str | None
+    is_redirect: bool
+
+
+def _validate_school(school: str) -> None:
+    if not _SCHOOL_RE.match(school):
+        raise AuthError(f"{school!r} is not a valid Edookit school subdomain")
 
 
 def _school_host(school: str) -> str:
@@ -56,21 +79,21 @@ def _callback_url(school: str) -> str:
     return f"{_school_base(school)}/user/oidc-login-callback"
 
 
-def _parse_set_cookie(raw: str) -> tuple[str, str] | None:
-    parsed: SimpleCookie = SimpleCookie()
-    parsed.load(raw)
-    for key, morsel in parsed.items():
-        return key, morsel.value
-    return None
+def _cookie_header(cookies: Mapping[str, str]) -> str:
+    return "; ".join(f"{k}={v}" for k, v in cookies.items())
 
 
-def _collect_set_cookies(resp: aiohttp.ClientResponse) -> dict[str, str]:
-    cookies: dict[str, str] = {}
-    for raw in resp.headers.getall("Set-Cookie", ()):
-        parsed = _parse_set_cookie(raw)
-        if parsed:
-            cookies[parsed[0]] = parsed[1]
-    return cookies
+def _auth_params(school: str, state: str, *, prompt_none: bool = False) -> dict[str, str]:
+    params = {
+        "response_type": "code",
+        "client_id": CLIENT_ID,
+        "redirect_uri": _callback_url(school),
+        "scope": "openid",
+        "state": state,
+    }
+    if prompt_none:
+        params["prompt"] = "none"
+    return params
 
 
 async def _fetch(
@@ -100,7 +123,7 @@ async def _fetch(
         headers: dict[str, str] = {}
         host_cookies = cookies_by_host.get(host)
         if host_cookies:
-            headers["Cookie"] = "; ".join(f"{k}={v}" for k, v in host_cookies.items())
+            headers["Cookie"] = _cookie_header(host_cookies)
 
         async with http.request(
             current_method,
@@ -110,15 +133,19 @@ async def _fetch(
             headers=headers,
             allow_redirects=False,
         ) as resp:
-            new_cookies = _collect_set_cookies(resp)
+            new_cookies = {key: morsel.value for key, morsel in resp.cookies.items()}
             if new_cookies:
                 cookies_by_host.setdefault(host, {}).update(new_cookies)
 
-            is_redirect = resp.status in (301, 302, 303, 307, 308)
+            is_redirect = resp.status in REDIRECT_STATUSES
             location = resp.headers.get("Location")
             text = "" if is_redirect else await resp.text()
             result = _FetchResult(
-                status=resp.status, url=str(resp.url), text=text, location=location
+                status=resp.status,
+                url=str(resp.url),
+                text=text,
+                location=location,
+                is_redirect=is_redirect,
             )
 
         if not (follow_redirects and is_redirect and location):
@@ -152,28 +179,60 @@ def _session_from_cookies(school: str, cookies_by_host: CookiesByHost) -> Sessio
     )
 
 
+async def _finish_callback(
+    http: aiohttp.ClientSession,
+    callback_url: str,
+    cookies_by_host: CookiesByHost,
+    school: str,
+) -> Session:
+    """Follow the final OIDC callback redirect chain and build a Session from it.
+
+    Shared tail of login() and refresh(): both end with "GET the code=
+    callback, make sure we didn't land back on the login page, then read the
+    cookies that piled up along the way."
+    """
+    result = await _fetch(http, "GET", callback_url, cookies_by_host, follow_redirects=True)
+    if is_login_url(result.url):
+        raise AuthError("edookit rejected the Plus4U authorization code")
+    return _session_from_cookies(school, cookies_by_host)
+
+
+async def probe_client_id(school: str) -> str:
+    """GET the Plus4U auth redirect without logging in, to observe its clientId.
+
+    Used by scripts/capture_fixtures.py to check CLIENT_ID against a real
+    school before spending the user's password on a full login.
+    """
+    _validate_school(school)
+    cookies_by_host: CookiesByHost = {}
+    async with _new_http_session() as http:
+        state = secrets.token_urlsafe(16)
+        step1 = await _fetch(
+            http, "GET", _AUTH_URL, cookies_by_host, params=_auth_params(school, state)
+        )
+        if not step1.is_redirect or not step1.location:
+            raise AuthError(f"expected a redirect from Plus4U auth endpoint, got {step1.status}")
+        return URL(step1.location).query.get("clientId", CLIENT_ID)
+
+
 async def login(school: str, username: str, password: str) -> Session:
     """Run the Plus4U OIDC password login and return a usable Session.
 
     Raises AuthError if the credentials are rejected or the flow's shape has
     changed (e.g. Edookit or Plus4U altered a redirect).
     """
+    _validate_school(school)
     cookies_by_host: CookiesByHost = {}
     async with _new_http_session() as http:
         state = secrets.token_urlsafe(16)
-        auth_params = {
-            "response_type": "code",
-            "client_id": _CLIENT_ID,
-            "redirect_uri": _callback_url(school),
-            "scope": "openid",
-            "state": state,
-        }
-        step1 = await _fetch(http, "GET", _AUTH_URL, cookies_by_host, params=auth_params)
-        if step1.status not in (301, 302, 303, 307, 308) or not step1.location:
+        step1 = await _fetch(
+            http, "GET", _AUTH_URL, cookies_by_host, params=_auth_params(school, state)
+        )
+        if not step1.is_redirect or not step1.location:
             raise AuthError(f"expected a redirect from Plus4U auth endpoint, got {step1.status}")
         login_url = URL(step1.location)
         server_state = login_url.query.get("state", state)
-        client_id = login_url.query.get("clientId", _CLIENT_ID)
+        client_id = login_url.query.get("clientId", CLIENT_ID)
 
         payload = {
             "clientId": client_id,
@@ -201,13 +260,7 @@ async def login(school: str, username: str, password: str) -> Session:
         if not step3.location or "code=" not in step3.location:
             raise AuthError("Plus4U did not return an authorization code")
 
-        step4 = await _fetch(
-            http, "GET", step3.location, cookies_by_host, follow_redirects=True
-        )
-        if "/user/login" in step4.url or "/user/oidc" in step4.url:
-            raise AuthError("edookit rejected the Plus4U authorization code")
-
-        return _session_from_cookies(school, cookies_by_host)
+        return await _finish_callback(http, step3.location, cookies_by_host, school)
 
 
 async def refresh(session: Session) -> Session:
@@ -218,42 +271,30 @@ async def refresh(session: Session) -> Session:
     Raises AuthError if the Plus4U cookies have themselves expired (roughly
     every 19 days), which means a full `login()` with the password is needed.
     """
+    _validate_school(session.school)
     cookies_by_host: CookiesByHost = {
         _PLUS4U_HOST: dict(session.plus4u_cookies),
         _school_host(session.school): dict(session.edookit_cookies),
     }
     async with _new_http_session() as http:
         state = secrets.token_urlsafe(16)
-        params = {
-            "response_type": "code",
-            "client_id": _CLIENT_ID,
-            "redirect_uri": _callback_url(session.school),
-            "scope": "openid",
-            "state": state,
-            "prompt": "none",
-        }
-        step1 = await _fetch(http, "GET", _AUTH_URL, cookies_by_host, params=params)
-        if (
-            step1.status not in (301, 302, 303, 307, 308)
-            or not step1.location
-            or "code=" not in step1.location
-        ):
+        step1 = await _fetch(
+            http,
+            "GET",
+            _AUTH_URL,
+            cookies_by_host,
+            params=_auth_params(session.school, state, prompt_none=True),
+        )
+        if not step1.is_redirect or not step1.location or "code=" not in step1.location:
             raise AuthError("Plus4U session expired; full login required")
 
-        step2 = await _fetch(
-            http, "GET", step1.location, cookies_by_host, follow_redirects=True
-        )
-        if "/user/login" in step2.url or "/user/oidc" in step2.url:
-            raise AuthError("edookit rejected the refreshed authorization code")
-
-        return _session_from_cookies(session.school, cookies_by_host)
+        return await _finish_callback(http, step1.location, cookies_by_host, session.school)
 
 
 def build_headers(session: Session) -> dict[str, str]:
     """Cookie/CSRF headers for a plain page request against the school's portal."""
-    cookies = session.edookit_cookies
     return {
-        "Cookie": "; ".join(f"{k}={v}" for k, v in cookies.items()),
+        "Cookie": _cookie_header(session.edookit_cookies),
         "X-CSRF-Token": session.csrf_token,
         "X-Requested-With": "XMLHttpRequest",
     }

@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 
 
 @dataclass(slots=True)
@@ -25,7 +24,18 @@ class Session:
     )
 
     @property
+    def base_url(self) -> str:
+        return f"https://{self.school}.edookit.net"
+
+    @property
     def is_edookit_expired(self) -> bool:
+        """True once the session is expected to have aged out.
+
+        A conservative estimate (login/refresh don't know the portal's real
+        TTL), meant for a caller to refresh proactively before it bothers
+        making a request that's likely to just be redirected to the login
+        page - not a substitute for handling `SessionExpired` reactively too.
+        """
         return datetime.now(UTC) >= self.edookit_expires_at
 
     def to_json(self) -> str:
@@ -38,10 +48,3 @@ class Session:
         data = json.loads(raw)
         data["edookit_expires_at"] = datetime.fromisoformat(data["edookit_expires_at"])
         return cls(**data)
-
-    def save(self, path: Path) -> None:
-        path.write_text(self.to_json())
-
-    @classmethod
-    def load(cls, path: Path) -> Session:
-        return cls.from_json(path.read_text())
