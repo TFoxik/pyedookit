@@ -1,0 +1,34 @@
+<!--
+Synthetic fixture, NOT captured from a real portal. It matches the selectors
+in src/pyedookit/parsers/timetable.py and exists to unit-test the parser's
+logic (day grouping, time extraction, cancelled/changed flags) before real
+fixtures exist. Replace/extend with real captured HTML via
+scripts/capture_fixtures.py once available - the real markup may differ and
+the parser's selectors will need updating to match.
+-->
+<div class="timetable">
+  <div class="timetable-day" data-day="0">
+    <div class="day-header">Pondělí 14. 9. 2026</div>
+    <div class="lesson-entry">
+      <span class="subject">Matematika</span>
+      <span class="teacher">Nováková</span>
+      <span class="room">12</span>
+      <span class="time">8:00 - 8:45</span>
+    </div>
+    <div class="lesson-entry lessonCancelled">
+      <span class="subject">Tělesná výchova</span>
+      <span class="teacher">Svoboda</span>
+      <span class="room">Tělocvična</span>
+      <span class="time">8:55 - 9:40</span>
+    </div>
+  </div>
+  <div class="timetable-day" data-day="1">
+    <div class="day-header">Úterý 15. 9. 2026</div>
+    <div class="lesson-entry lessonChanged">
+      <span class="subject">Český jazyk (suplování)</span>
+      <span class="teacher">Dvořák</span>
+      <span class="room">5</span>
+      <span class="time">8:00 - 8:45</span>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,50 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pyedookit"
+version = "0.1.0"
+description = "Async client for the Edookit parent portal (edookit.net)"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [{ name = "tomas.liska" }]
+dependencies = [
+    # aioresponses 0.7.9 (our test mock) breaks on aiohttp's ClientResponse
+    # signature change in >=3.10 (missing `stream_writer` kwarg); cap until
+    # aioresponses ships a fix. Runtime behavior with aiohttp itself is fine.
+    "aiohttp>=3.9,<3.10",
+    "beautifulsoup4>=4.12",
+    "lxml>=5.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/tfox/pyedookit"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pyedookit"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+strict = true
+python_version = "3.12"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "aioresponses>=0.7",
+    "ruff>=0.6",
+    "mypy>=1.11",
+]
