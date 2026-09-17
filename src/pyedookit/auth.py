@@ -132,6 +132,13 @@ async def _fetch(
     raise AuthError("too many redirects while following the Plus4U/edookit login flow")
 
 
+def _new_http_session() -> aiohttp.ClientSession:
+    # Cookies are tracked manually in `cookies_by_host`, not via aiohttp's own
+    # jar, so redirect-following never needs a real one; tests replace this
+    # factory with a fake session instead of mocking ClientSession internals.
+    return aiohttp.ClientSession(cookie_jar=aiohttp.DummyCookieJar())
+
+
 def _session_from_cookies(school: str, cookies_by_host: CookiesByHost) -> Session:
     edookit_cookies = cookies_by_host.get(_school_host(school), {})
     plus4u_cookies = cookies_by_host.get(_PLUS4U_HOST, {})
@@ -152,7 +159,7 @@ async def login(school: str, username: str, password: str) -> Session:
     changed (e.g. Edookit or Plus4U altered a redirect).
     """
     cookies_by_host: CookiesByHost = {}
-    async with aiohttp.ClientSession(cookie_jar=aiohttp.DummyCookieJar()) as http:
+    async with _new_http_session() as http:
         state = secrets.token_urlsafe(16)
         auth_params = {
             "response_type": "code",
@@ -215,7 +222,7 @@ async def refresh(session: Session) -> Session:
         _PLUS4U_HOST: dict(session.plus4u_cookies),
         _school_host(session.school): dict(session.edookit_cookies),
     }
-    async with aiohttp.ClientSession(cookie_jar=aiohttp.DummyCookieJar()) as http:
+    async with _new_http_session() as http:
         state = secrets.token_urlsafe(16)
         params = {
             "response_type": "code",

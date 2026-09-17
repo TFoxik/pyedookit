@@ -38,7 +38,7 @@ class EdookitClient:
         html = await self._get(_TIMETABLE_PATH, params={"familyTimetable-value": week_offset})
         return parse_timetable(html, week_start=_week_start(week_offset))
 
-    async def _get(self, path: str, params: dict[str, object] | None = None) -> str:
+    async def _get(self, path: str, params: dict[str, int] | None = None) -> str:
         base = f"https://{self._session.school}.edookit.net"
         headers = auth.build_headers(self._session)
         async with aiohttp.ClientSession() as http:
