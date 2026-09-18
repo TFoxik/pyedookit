@@ -19,11 +19,15 @@ _AUTH_URL = f"{_PLUS4U_OIDC_BASE}/oidc/auth"
 _AUTH_PASSWORD_URL = f"{_PLUS4U_OIDC_BASE}/authPassword/authenticate"
 _REALM_CODE = "uuIdentityPasswordAuthNRealm"
 
-# Observed on one school's login redirect. Edookit apps may all share a single
-# Plus4U OIDC client, but this hasn't been confirmed across schools yet -
-# `probe_client_id()` / `scripts/capture_fixtures.py` check the value seen on
-# a real portal against this one.
-CLIENT_ID = "0fa24fa43e794de89003790253a93cb6"
+# Confirmed against a real portal: the OIDC client_id is per-school, not a
+# single value shared across every Edookit install (third-party docs this
+# was originally inferred from implied otherwise). Each school's /user/login
+# page embeds it in a small inline JS config block, e.g.
+#   uu_app_oidc_providers_oidcg02_client_id: "983960dcb7b84b34b9aecc5194381d56"
+# so it has to be scraped fresh per school rather than hardcoded.
+_CLIENT_ID_RE = re.compile(
+    r"uu_app_oidc_providers_oidcg02_client_id\s*:\s*['\"]([^'\"]+)['\"]"
+)
 
 _PLUS4U_HOST = "uuidentity.plus4u.net"
 _MAX_REDIRECTS = 5
@@ -83,10 +87,12 @@ def _cookie_header(cookies: Mapping[str, str]) -> str:
     return "; ".join(f"{k}={v}" for k, v in cookies.items())
 
 
-def _auth_params(school: str, state: str, *, prompt_none: bool = False) -> dict[str, str]:
+def _auth_params(
+    school: str, client_id: str, state: str, *, prompt_none: bool = False
+) -> dict[str, str]:
     params = {
         "response_type": "code",
-        "client_id": CLIENT_ID,
+        "client_id": client_id,
         "redirect_uri": _callback_url(school),
         "scope": "openid",
         "state": state,
@@ -94,6 +100,22 @@ def _auth_params(school: str, state: str, *, prompt_none: bool = False) -> dict[
     if prompt_none:
         params["prompt"] = "none"
     return params
+
+
+async def _discover_client_id(
+    http: aiohttp.ClientSession, school: str, cookies_by_host: CookiesByHost
+) -> str:
+    """Scrape the school's own /user/login page for its Plus4U client_id.
+
+    Routed through `_fetch` (not a bare request) so its Set-Cookie response
+    - PHPSESSID etc. - joins the same cookie tracking the rest of the login
+    flow uses, rather than being discarded.
+    """
+    result = await _fetch(http, "GET", f"{_school_base(school)}/user/login", cookies_by_host)
+    match = _CLIENT_ID_RE.search(result.text)
+    if not match:
+        raise AuthError(f"could not find a Plus4U client_id on {school}'s login page")
+    return match.group(1)
 
 
 async def _fetch(
@@ -198,21 +220,15 @@ async def _finish_callback(
 
 
 async def probe_client_id(school: str) -> str:
-    """GET the Plus4U auth redirect without logging in, to observe its clientId.
+    """Discover a school's Plus4U client_id without logging in.
 
-    Used by scripts/capture_fixtures.py to check CLIENT_ID against a real
-    school before spending the user's password on a full login.
+    Used by scripts/capture_fixtures.py to show what login()/refresh() will
+    use for this school before spending the user's password.
     """
     _validate_school(school)
     cookies_by_host: CookiesByHost = {}
     async with _new_http_session() as http:
-        state = secrets.token_urlsafe(16)
-        step1 = await _fetch(
-            http, "GET", _AUTH_URL, cookies_by_host, params=_auth_params(school, state)
-        )
-        if not step1.is_redirect or not step1.location:
-            raise AuthError(f"expected a redirect from Plus4U auth endpoint, got {step1.status}")
-        return URL(step1.location).query.get("clientId", CLIENT_ID)
+        return await _discover_client_id(http, school, cookies_by_host)
 
 
 async def login(school: str, username: str, password: str) -> Session:
@@ -224,18 +240,23 @@ async def login(school: str, username: str, password: str) -> Session:
     _validate_school(school)
     cookies_by_host: CookiesByHost = {}
     async with _new_http_session() as http:
+        client_id = await _discover_client_id(http, school, cookies_by_host)
         state = secrets.token_urlsafe(16)
         step1 = await _fetch(
-            http, "GET", _AUTH_URL, cookies_by_host, params=_auth_params(school, state)
+            http,
+            "GET",
+            _AUTH_URL,
+            cookies_by_host,
+            params=_auth_params(school, client_id, state),
         )
         if not step1.is_redirect or not step1.location:
             raise AuthError(f"expected a redirect from Plus4U auth endpoint, got {step1.status}")
         login_url = URL(step1.location)
         server_state = login_url.query.get("state", state)
-        client_id = login_url.query.get("clientId", CLIENT_ID)
+        server_client_id = login_url.query.get("clientId", client_id)
 
         payload = {
-            "clientId": client_id,
+            "clientId": server_client_id,
             "state": server_state,
             "rememberMe": True,
             "realmCode": _REALM_CODE,
@@ -277,13 +298,14 @@ async def refresh(session: Session) -> Session:
         _school_host(session.school): dict(session.edookit_cookies),
     }
     async with _new_http_session() as http:
+        client_id = await _discover_client_id(http, session.school, cookies_by_host)
         state = secrets.token_urlsafe(16)
         step1 = await _fetch(
             http,
             "GET",
             _AUTH_URL,
             cookies_by_host,
-            params=_auth_params(session.school, state, prompt_none=True),
+            params=_auth_params(session.school, client_id, state, prompt_none=True),
         )
         if not step1.is_redirect or not step1.location or "code=" not in step1.location:
             raise AuthError("Plus4U session expired; full login required")

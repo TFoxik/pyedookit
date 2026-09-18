@@ -5,10 +5,10 @@ Run this yourself so credentials never enter the assistant's session:
 
     ! python scripts/capture_fixtures.py <school-subdomain>
 
-It first checks the observed Plus4U `clientId` against `auth.CLIENT_ID`
-without needing a password, then prompts for username/password
-interactively (not via argv, so they don't end up in shell history), logs
-in, and saves:
+It first discovers this school's Plus4U client_id (scraped from its own
+/user/login page - it's per-school, not shared) without needing a password,
+then prompts for username/password interactively (not via argv, so they
+don't end up in shell history), logs in, and saves:
 
   captures/timetable_current_week.html
   captures/timetable_next_week.html
@@ -40,15 +40,8 @@ async def main() -> None:
         raise SystemExit(2)
     school = sys.argv[1]
 
-    observed_client_id = await auth.probe_client_id(school)
-    if observed_client_id == auth.CLIENT_ID:
-        print(f"Plus4U clientId confirmed: {observed_client_id!r}")
-    else:
-        print(
-            f"NOTE: observed Plus4U clientId {observed_client_id!r} differs from "
-            f"the hardcoded CLIENT_ID {auth.CLIENT_ID!r} in src/pyedookit/auth.py - "
-            "update it before relying on this school's login working elsewhere."
-        )
+    client_id = await auth.probe_client_id(school)
+    print(f"Discovered Plus4U client_id for {school}: {client_id!r}")
 
     username = input("Plus4U username/email: ")
     password = getpass.getpass("Plus4U password: ")

@@ -7,6 +7,7 @@ from pyedookit.session import Session
 from .fakes import FakeClientSession, ok, redirect, rejected
 
 SCHOOL = "zs-example"
+LOGIN_URL = f"https://{SCHOOL}.edookit.net/user/login"
 AUTH_URL_PREFIX = (
     "https://uuidentity.plus4u.net/uu-oidc-maing02/bb977a99f4cc4c37a2afce3fd599d0a7/oidc/auth"
 )
@@ -18,6 +19,23 @@ CALLBACK_URL = f"https://{SCHOOL}.edookit.net/user/oidc-login-callback"
 DASHBOARD_URL = f"https://{SCHOOL}.edookit.net/overview/updates"
 LOGIN_PAGE_URL = "https://uuidentity.plus4u.net/uu-oidc-maing02/login?state=srv-state&clientId=cid-1"
 CONTINUE_URL = "https://uuidentity.plus4u.net/uu-oidc-maing02/continue"
+
+# The client_id is embedded per-school in this inline JS config block on the
+# real portal's own /user/login page - see auth._CLIENT_ID_RE.
+DISCOVERED_CLIENT_ID = "983960dcb7b84b34b9aecc5194381d56"
+LOGIN_PAGE_HTML = f"""
+<script type="text/javascript">
+    window.UU5 = {{
+        Environment: {{
+            uu_app_oidc_providers_oidcg02_client_id: "{DISCOVERED_CLIENT_ID}"
+        }}
+    }};
+</script>
+"""
+
+
+def _discovery_route() -> tuple[str, str, object]:
+    return ("GET", LOGIN_URL, ok(LOGIN_URL, body=LOGIN_PAGE_HTML))
 
 
 def _install_fake_session(monkeypatch: pytest.MonkeyPatch, routes) -> FakeClientSession:
@@ -31,6 +49,7 @@ async def test_login_success_extracts_edookit_and_plus4u_cookies(monkeypatch):
     _install_fake_session(
         monkeypatch,
         [
+            _discovery_route(),
             ("GET", AUTH_URL_PREFIX, redirect(LOGIN_PAGE_URL)),
             (
                 "POST",
@@ -69,6 +88,7 @@ async def test_login_raises_auth_error_on_bad_credentials(monkeypatch):
     _install_fake_session(
         monkeypatch,
         [
+            _discovery_route(),
             ("GET", AUTH_URL_PREFIX, redirect(LOGIN_PAGE_URL)),
             ("POST", PASSWORD_URL, rejected(401)),
         ],
@@ -76,6 +96,26 @@ async def test_login_raises_auth_error_on_bad_credentials(monkeypatch):
 
     with pytest.raises(AuthError):
         await auth.login(SCHOOL, "user@example.com", "wrong")
+
+
+@pytest.mark.asyncio
+async def test_login_raises_auth_error_when_client_id_not_found(monkeypatch):
+    _install_fake_session(
+        monkeypatch,
+        [("GET", LOGIN_URL, ok(LOGIN_URL, body="<html>no config here</html>"))],
+    )
+
+    with pytest.raises(AuthError):
+        await auth.login(SCHOOL, "user@example.com", "hunter2")
+
+
+@pytest.mark.asyncio
+async def test_probe_client_id_returns_the_discovered_value(monkeypatch):
+    _install_fake_session(monkeypatch, [_discovery_route()])
+
+    client_id = await auth.probe_client_id(SCHOOL)
+
+    assert client_id == DISCOVERED_CLIENT_ID
 
 
 @pytest.mark.asyncio
@@ -89,6 +129,7 @@ async def test_refresh_success_reuses_plus4u_cookies_without_password(monkeypatc
     _install_fake_session(
         monkeypatch,
         [
+            _discovery_route(),
             ("GET", AUTH_URL_PREFIX, redirect(f"{CALLBACK_URL}?code=fresh123")),
             ("GET", CALLBACK_URL, redirect(DASHBOARD_URL)),
             (
@@ -125,6 +166,7 @@ async def test_refresh_raises_auth_error_when_plus4u_cookie_expired(monkeypatch)
     _install_fake_session(
         monkeypatch,
         [
+            _discovery_route(),
             ("GET", AUTH_URL_PREFIX, redirect(LOGIN_PAGE_URL)),
         ],
     )
