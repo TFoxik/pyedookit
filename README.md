@@ -12,11 +12,21 @@ changes its markup.
 
 ## Status
 
-v0.1.0 - timetable only (current/next week, term list). See
-`scripts/capture_fixtures.py` for how to capture real portal HTML and correct
-the parser's selectors against it; the current selectors are inferred from
-third-party documentation and a synthetic fixture, not yet verified against a
-live portal.
+v0.1.0 - timetable only. Verified end-to-end against a real portal
+(login, session-settling after the OIDC callback, and the timetable parser
+all confirmed working on real data).
+
+**Only `week_offset=0` (the current week) is confirmed working.** The
+portal accepts `week_offset=1` ("next week") without error, but returns the
+same week's data back rather than actually advancing - the real
+week-navigation parameter hasn't been identified yet. Since a school's
+weekly timetable is typically the same all year, current-week-only is
+usually enough in practice. See `scripts/capture_fixtures.py` for how to
+capture and inspect real portal HTML if you want to chase this further (a
+browser HAR trace of clicking the forward-week arrow is what's needed).
+
+Cancelled/substituted lessons are also unverified: no real capture has had
+one yet, so `Lesson.is_changed`/`is_cancelled` are always `False` for now.
 
 ## Install
 

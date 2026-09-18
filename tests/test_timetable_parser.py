@@ -1,49 +1,43 @@
-from datetime import date, time
+from datetime import date, datetime, time
 from pathlib import Path
 
 import pytest
 
 from pyedookit.exceptions import ParseError
-from pyedookit.parsers.timetable import parse_timetable
+from pyedookit.parsers.timetable import parse_terms, parse_timetable
 
-FIXTURE = (Path(__file__).parent / "fixtures" / "timetable_synthetic.html").read_text()
+FIXTURE = (Path(__file__).parent / "fixtures" / "timetable_real_structure.html").read_text()
 
 
-def test_parses_lessons_grouped_by_day():
+def test_parses_each_lesson_info_block_with_its_own_date():
     lessons = parse_timetable(FIXTURE)
-    assert len(lessons) == 3
+    assert len(lessons) == 2
 
-    monday = [ls for ls in lessons if ls.start.date() == date(2026, 9, 14)]
-    assert len(monday) == 2
-    assert monday[0].subject == "Matematika"
-    assert monday[0].start.time() == time(8, 0)
-    assert monday[0].end.time() == time(8, 45)
-    assert monday[0].teacher == "Nováková"
-    assert monday[0].room == "12"
-    assert not monday[0].is_cancelled
-    assert not monday[0].is_changed
+    monday = lessons[0]
+    assert monday.start == datetime(2026, 9, 14, 8, 0)
+    assert monday.end == datetime(2026, 9, 14, 8, 45)
+    assert monday.subject == "Matematika"
+    assert monday.teacher == "Novák J."
+    assert monday.room == "1.A"
+    assert monday.group == "I.A"
+    assert monday.note == "Sčítání do dvaceti"
 
 
-def test_detects_cancelled_lesson():
+def test_handles_a_lesson_with_no_curriculum_note():
     lessons = parse_timetable(FIXTURE)
-    cancelled = next(ls for ls in lessons if ls.subject == "Tělesná výchova")
-    assert cancelled.is_cancelled
-    assert not cancelled.is_changed
-
-
-def test_detects_changed_lesson():
-    lessons = parse_timetable(FIXTURE)
-    changed = next(ls for ls in lessons if "suplování" in ls.subject)
-    assert changed.is_changed
-    assert not changed.is_cancelled
-
-
-def test_second_day_uses_its_own_date():
-    lessons = parse_timetable(FIXTURE)
-    tuesday = next(ls for ls in lessons if ls.subject.startswith("Český"))
+    tuesday = lessons[1]
     assert tuesday.start.date() == date(2026, 9, 15)
+    assert tuesday.start.time() == time(9, 0)
+    assert tuesday.subject == "Tělesná výchova"
+    assert tuesday.room == "TV 1"
+    assert tuesday.note is None
 
 
-def test_raises_parse_error_on_unrecognised_page():
+def test_raises_parse_error_when_no_lesson_info_blocks_found():
     with pytest.raises(ParseError):
-        parse_timetable("<html><body>Přihlašovací stránka</body></html>")
+        parse_timetable("<html><body>no lessons here</body></html>")
+
+
+def test_parse_terms_reads_term_selector_links():
+    terms = parse_terms(FIXTURE)
+    assert {t.id: t.name for t in terms} == {"61": "2026/2027", "58": "2025/2026"}

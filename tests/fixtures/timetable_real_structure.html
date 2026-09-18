@@ -1,0 +1,57 @@
+<!--
+Synthetic fixture, but its element structure is not a guess: it matches
+what a real portal capture confirmed on 2026-09-18 (a real school) - the
+lesson-info block, its fixed div order, the date_time spans, and the
+"Ucivo:" note prefix. Field values below (names, subjects, rooms,
+curriculum text) are placeholders; only the shape is authentic.
+
+The visible week grid itself is an absolutely-positioned canvas with no
+semantic day/time markup at all - parsing it wasn't attempted; these
+hidden per-lesson detail blocks are what parse_timetable() reads instead.
+
+Known gap: no cancelled/substituted lesson was ever observed in a real
+capture, so this fixture has none either, and is_changed/is_cancelled
+are untested and always False in the parser for now.
+-->
+<div class="lesson-info" style="display:none" id="lesson-info-100001">
+    <h3 class="attendance-heading">Informace o hodině</h3>
+    <div>
+        Po 14.&thinsp;9.&thinsp;2026, <span class="date_time">8:00</span>&ndash;<span class="date_time">8:45</span>
+    </div>
+    <div>
+        Mat - I.A
+    </div>
+    <div>
+        Matematika
+    </div>
+    <div>
+        Novák J.
+    </div>
+    <div>
+        1.A
+    </div>
+    <div>
+        Učivo: Sčítání do dvaceti
+    </div>
+</div>
+<div class="lesson-info" style="display:none" id="lesson-info-100002">
+    <h3 class="attendance-heading">Informace o hodině</h3>
+    <div>
+        Út 15.&thinsp;9.&thinsp;2026, <span class="date_time">9:00</span>&ndash;<span class="date_time">9:45</span>
+    </div>
+    <div>
+        Tv - I.A
+    </div>
+    <div>
+        Tělesná výchova
+    </div>
+    <div>
+        Svoboda P.
+    </div>
+    <div>
+        TV 1
+    </div>
+</div>
+
+<a href="/timetable/?mainMenu-termSelector-new=61&amp;do=mainMenu-termSelector-change" class="selected" id="selected-term">2026/2027</a>
+<a href="/timetable/?mainMenu-termSelector-new=58&amp;do=mainMenu-termSelector-change">2025/2026</a>

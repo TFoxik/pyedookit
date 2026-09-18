@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from datetime import date, timedelta
-
 import aiohttp
 
 from . import auth
@@ -40,7 +38,7 @@ class EdookitClient:
 
     async def get_timetable(self, week_offset: int = 0) -> list[Lesson]:
         html = await self.fetch_timetable_html(week_offset)
-        return parse_timetable(html, week_start=_week_start(week_offset))
+        return parse_timetable(html)
 
     async def fetch_timetable_html(self, week_offset: int = 0) -> str:
         """Raw `/timetable/` HTML for one week - also used by
@@ -71,9 +69,3 @@ class EdookitClient:
             if resp.status in auth.REDIRECT_STATUSES or auth.is_login_url(str(resp.url)):
                 raise SessionExpired("edookit session has expired")
             return await resp.text()
-
-
-def _week_start(week_offset: int) -> date:
-    today = date.today()
-    monday = today - timedelta(days=today.weekday())
-    return monday + timedelta(weeks=week_offset)
