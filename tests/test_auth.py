@@ -17,6 +17,7 @@ PASSWORD_URL = (
 )
 CALLBACK_URL = f"https://{SCHOOL}.edookit.net/user/oidc-login-callback"
 DASHBOARD_URL = f"https://{SCHOOL}.edookit.net/overview/updates"
+SCHOOL_BASE_URL = f"https://{SCHOOL}.edookit.net"
 LOGIN_PAGE_URL = "https://uuidentity.plus4u.net/uu-oidc-maing02/login?state=srv-state&clientId=cid-1"
 CONTINUE_URL = "https://uuidentity.plus4u.net/uu-oidc-maing02/continue"
 
@@ -36,6 +37,13 @@ LOGIN_PAGE_HTML = f"""
 
 def _discovery_route() -> tuple[str, str, object]:
     return ("GET", LOGIN_URL, ok(LOGIN_URL, body=LOGIN_PAGE_HTML))
+
+
+def _settle_route() -> tuple[str, str, object]:
+    # The extra GET to the portal root that _finish_callback makes after the
+    # OIDC callback resolves - confirmed against a real browser trace to be
+    # what actually activates the full session (see auth._finish_callback).
+    return ("GET", SCHOOL_BASE_URL, ok(SCHOOL_BASE_URL))
 
 
 def _install_fake_session(monkeypatch: pytest.MonkeyPatch, routes) -> FakeClientSession:
@@ -72,6 +80,7 @@ async def test_login_success_extracts_edookit_and_plus4u_cookies(monkeypatch):
                     },
                 ),
             ),
+            _settle_route(),
         ],
     )
 
@@ -146,6 +155,7 @@ async def test_refresh_success_reuses_plus4u_cookies_without_password(monkeypatc
                     },
                 ),
             ),
+            _settle_route(),
         ],
     )
 

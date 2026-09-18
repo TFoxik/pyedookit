@@ -212,10 +212,20 @@ async def _finish_callback(
     Shared tail of login() and refresh(): both end with "GET the code=
     callback, make sure we didn't land back on the login page, then read the
     cookies that piled up along the way."
+
+    Confirmed against a real browser trace (HAR): after the callback GET
+    resolves (still 200 on /oidc/callback), the browser makes one more GET
+    to the portal root, which is what actually settles the session server
+    side - skipping it leaves the account looking like it has almost no
+    modules enabled (only the dashboard and badges), even though login
+    itself succeeded and the session cookies are valid.
     """
     result = await _fetch(http, "GET", callback_url, cookies_by_host, follow_redirects=True)
     if is_login_url(result.url):
         raise AuthError("edookit rejected the Plus4U authorization code")
+    settle = await _fetch(http, "GET", _school_base(school), cookies_by_host, follow_redirects=True)
+    if is_login_url(settle.url):
+        raise AuthError("session did not settle after the OIDC callback")
     return _session_from_cookies(school, cookies_by_host)
 
 

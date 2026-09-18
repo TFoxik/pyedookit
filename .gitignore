@@ -9,3 +9,4 @@ dist/
 .env
 cookies.json
 captures/
+.DS_Store
