@@ -21,3 +21,8 @@ def content_fingerprint(html: str) -> str:
         tag.decompose()
     text = " ".join(root.get_text(" ", strip=True).split())
     return hashlib.sha256(_NUMBER_RE.sub("#", text).encode()).hexdigest()
+
+
+def has_portal_content(html: str) -> bool:
+    """False for error and maintenance pages, which lack the portal's content section."""
+    return BeautifulSoup(html, "lxml").select_one("section.content") is not None
