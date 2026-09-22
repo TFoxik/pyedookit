@@ -2,22 +2,17 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time
 
 from bs4 import BeautifulSoup, Tag
 
 from ..exceptions import ParseError
 from ..models import PORTAL_TZ, Lesson, Term
+from .dates import find_days
 
-_DATE_RE = re.compile(r"(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})")
 _TIME_RANGE_RE = re.compile(r"(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})")
 _TERM_ID_RE = re.compile(r"termSelector-new=(\d+)")
 _NOTE_PREFIX = "Učivo:"
-
-# The portal replaces the date with a word for recent days, e.g.
-# "Dnes , 8:00 – 8:45" (confirmed for Včera/Dnes; Zítra is assumed).
-_RELATIVE_DAYS = {"včera": -1, "dnes": 0, "zítra": 1}
-_RELATIVE_DAY_RE = re.compile(r"^\s*(včera|dnes|zítra)\b", re.IGNORECASE)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -84,7 +79,8 @@ def _parse_lesson_info(block: Tag, today: date) -> Lesson | None:
         return None
 
     text = datetime_div.get_text(" ", strip=True)
-    lesson_date = _lesson_date(text, today)
+    days = find_days(text, today)
+    lesson_date = days[0] if days else None
     time_match = _TIME_RANGE_RE.search(text)
     if lesson_date is None or not time_match:
         return None
@@ -117,11 +113,3 @@ def _parse_lesson_info(block: Tag, today: date) -> Lesson | None:
         note=note,
     )
 
-
-def _lesson_date(text: str, today: date) -> date | None:
-    if relative := _RELATIVE_DAY_RE.match(text):
-        return today + timedelta(days=_RELATIVE_DAYS[relative.group(1).lower()])
-    if absolute := _DATE_RE.search(text):
-        day, month, year = (int(g) for g in absolute.groups())
-        return date(year, month, day)
-    return None
