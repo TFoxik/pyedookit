@@ -3,13 +3,14 @@ from __future__ import annotations
 import json as _json
 import re
 import secrets
-from collections.abc import Mapping
+from collections.abc import AsyncIterator, Mapping
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
 import aiohttp
 from yarl import URL
 
-from .exceptions import AuthError
+from .exceptions import AuthError, EdookitConnectionError
 from .session import Session
 
 _PLUS4U_OIDC_BASE = (
@@ -38,6 +39,8 @@ _MAX_REDIRECTS = 5
 _SCHOOL_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,62}$")
 
 REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
+
+REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=30)
 
 # Edookit sends the browser back to one of these paths when a session has
 # expired or was never valid; shared with client.py so "did we get logged
@@ -147,28 +150,32 @@ async def _fetch(
         if host_cookies:
             headers["Cookie"] = _cookie_header(host_cookies)
 
-        async with http.request(
-            current_method,
-            current_url,
-            params=current_params,
-            json=current_json,
-            headers=headers,
-            allow_redirects=False,
-        ) as resp:
-            new_cookies = {key: morsel.value for key, morsel in resp.cookies.items()}
-            if new_cookies:
-                cookies_by_host.setdefault(host, {}).update(new_cookies)
+        try:
+            async with http.request(
+                current_method,
+                current_url,
+                params=current_params,
+                json=current_json,
+                headers=headers,
+                allow_redirects=False,
+                timeout=REQUEST_TIMEOUT,
+            ) as resp:
+                new_cookies = {key: morsel.value for key, morsel in resp.cookies.items()}
+                if new_cookies:
+                    cookies_by_host.setdefault(host, {}).update(new_cookies)
 
-            is_redirect = resp.status in REDIRECT_STATUSES
-            location = resp.headers.get("Location")
-            text = "" if is_redirect else await resp.text()
-            result = _FetchResult(
-                status=resp.status,
-                url=str(resp.url),
-                text=text,
-                location=location,
-                is_redirect=is_redirect,
-            )
+                is_redirect = resp.status in REDIRECT_STATUSES
+                location = resp.headers.get("Location")
+                text = "" if is_redirect else await resp.text()
+                result = _FetchResult(
+                    status=resp.status,
+                    url=str(resp.url),
+                    text=text,
+                    location=location,
+                    is_redirect=is_redirect,
+                )
+        except (aiohttp.ClientError, TimeoutError) as err:
+            raise EdookitConnectionError(f"request to {host} failed: {err}") from err
 
         if not (follow_redirects and is_redirect and location):
             return result
@@ -186,6 +193,15 @@ def _new_http_session() -> aiohttp.ClientSession:
     # jar, so redirect-following never needs a real one; tests replace this
     # factory with a fake session instead of mocking ClientSession internals.
     return aiohttp.ClientSession(cookie_jar=aiohttp.DummyCookieJar())
+
+
+@asynccontextmanager
+async def _http_session(http: aiohttp.ClientSession | None) -> AsyncIterator[aiohttp.ClientSession]:
+    if http is not None:
+        yield http
+        return
+    async with _new_http_session() as own:
+        yield own
 
 
 def _session_from_cookies(school: str, cookies_by_host: CookiesByHost) -> Session:
@@ -241,15 +257,26 @@ async def probe_client_id(school: str) -> str:
         return await _discover_client_id(http, school, cookies_by_host)
 
 
-async def login(school: str, username: str, password: str) -> Session:
+async def login(
+    school: str,
+    username: str,
+    password: str,
+    *,
+    http: aiohttp.ClientSession | None = None,
+) -> Session:
     """Run the Plus4U OIDC password login and return a usable Session.
 
     Raises AuthError if the credentials are rejected or the flow's shape has
-    changed (e.g. Edookit or Plus4U altered a redirect).
+    changed (e.g. Edookit or Plus4U altered a redirect), and
+    EdookitConnectionError if either host can't be reached.
+
+    A passed-in `http` session must not keep its own cookies (use
+    `aiohttp.DummyCookieJar()`): cookies are tracked per host by hand here,
+    and a real jar would also collect and resend them.
     """
     _validate_school(school)
     cookies_by_host: CookiesByHost = {}
-    async with _new_http_session() as http:
+    async with _http_session(http) as http:
         client_id = await _discover_client_id(http, school, cookies_by_host)
         state = secrets.token_urlsafe(16)
         step1 = await _fetch(
@@ -294,20 +321,21 @@ async def login(school: str, username: str, password: str) -> Session:
         return await _finish_callback(http, step3.location, cookies_by_host, school)
 
 
-async def refresh(session: Session) -> Session:
+async def refresh(session: Session, *, http: aiohttp.ClientSession | None = None) -> Session:
     """Obtain a fresh edookit session using the stored Plus4U cookies.
 
     No password is needed; this is what keeps a long-running Home Assistant
     integration logged in across the ~30-60 minute edookit session lifetime.
     Raises AuthError if the Plus4U cookies have themselves expired (roughly
     every 19 days), which means a full `login()` with the password is needed.
+    `http` has the same cookie-jar requirement as in `login()`.
     """
     _validate_school(session.school)
     cookies_by_host: CookiesByHost = {
         _PLUS4U_HOST: dict(session.plus4u_cookies),
         _school_host(session.school): dict(session.edookit_cookies),
     }
-    async with _new_http_session() as http:
+    async with _http_session(http) as http:
         client_id = await _discover_client_id(http, session.school, cookies_by_host)
         state = secrets.token_urlsafe(16)
         step1 = await _fetch(

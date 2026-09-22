@@ -87,3 +87,16 @@ class FakeClientSession:
 
     def get(self, url: str, **kwargs: object) -> FakeResponse:
         return self.request("GET", url, **kwargs)
+
+
+class FailingResponse:
+    """Raises on entry, the way aiohttp does when a host can't be reached."""
+
+    def __init__(self, error: BaseException) -> None:
+        self._error = error
+
+    async def __aenter__(self) -> FailingResponse:
+        raise self._error
+
+    async def __aexit__(self, *exc: object) -> bool:
+        return False

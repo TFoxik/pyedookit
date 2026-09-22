@@ -2,6 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from zoneinfo import ZoneInfo
+
+# The portal renders wall-clock times with no zone; every Edookit school is
+# Czech, so parsed times are pinned to Prague rather than left naive.
+PORTAL_TZ = ZoneInfo("Europe/Prague")
 
 
 @dataclass(frozen=True, slots=True)

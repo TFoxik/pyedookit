@@ -1,10 +1,11 @@
+import aiohttp
 import pytest
 
 from pyedookit import auth
-from pyedookit.exceptions import AuthError
+from pyedookit.exceptions import AuthError, EdookitConnectionError
 from pyedookit.session import Session
 
-from .fakes import FakeClientSession, ok, redirect, rejected
+from .fakes import FailingResponse, FakeClientSession, ok, redirect, rejected
 
 SCHOOL = "zs-example"
 LOGIN_URL = f"https://{SCHOOL}.edookit.net/user/login"
@@ -116,6 +117,29 @@ async def test_login_raises_auth_error_when_client_id_not_found(monkeypatch):
 
     with pytest.raises(AuthError):
         await auth.login(SCHOOL, "user@example.com", "hunter2")
+
+
+@pytest.mark.asyncio
+async def test_login_raises_connection_error_when_portal_is_unreachable(monkeypatch):
+    _install_fake_session(
+        monkeypatch,
+        [("GET", LOGIN_URL, FailingResponse(aiohttp.ClientConnectionError("refused")))],
+    )
+
+    with pytest.raises(EdookitConnectionError):
+        await auth.login(SCHOOL, "user@example.com", "hunter2")
+
+
+@pytest.mark.asyncio
+async def test_login_uses_an_injected_http_session_instead_of_opening_one(monkeypatch):
+    def fail() -> None:
+        raise AssertionError("login opened its own session despite http= being passed")
+
+    monkeypatch.setattr(auth, "_new_http_session", fail)
+    injected = FakeClientSession([("GET", LOGIN_URL, ok(LOGIN_URL, body="<html></html>"))])
+
+    with pytest.raises(AuthError):
+        await auth.login(SCHOOL, "user@example.com", "hunter2", http=injected)
 
 
 @pytest.mark.asyncio

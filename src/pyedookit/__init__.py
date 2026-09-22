@@ -1,12 +1,20 @@
 from .auth import login, refresh
 from .client import EdookitClient
-from .exceptions import AuthError, EdookitError, ParseError, SessionExpired
-from .models import Lesson, Student, Term
+from .exceptions import (
+    AuthError,
+    EdookitConnectionError,
+    EdookitError,
+    ParseError,
+    SessionExpired,
+)
+from .models import PORTAL_TZ, Lesson, Student, Term
 from .session import Session
 
 __all__ = [
+    "PORTAL_TZ",
     "AuthError",
     "EdookitClient",
+    "EdookitConnectionError",
     "EdookitError",
     "Lesson",
     "ParseError",

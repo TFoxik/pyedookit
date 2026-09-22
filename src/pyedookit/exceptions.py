@@ -16,3 +16,7 @@ class ParseError(EdookitError):
     Edookit's markup isn't versioned, so this is the signal a parser needs updating
     rather than a bug in the caller's usage.
     """
+
+
+class EdookitConnectionError(EdookitError):
+    """The portal or Plus4U could not be reached (network error or timeout)."""

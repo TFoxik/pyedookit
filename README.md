@@ -12,7 +12,7 @@ changes its markup.
 
 ## Status
 
-v0.1.0 - timetable only. Verified end-to-end against a real portal
+v0.2.0 - timetable only. Verified end-to-end against a real portal
 (login, session-settling after the OIDC callback, and the timetable parser
 all confirmed working on real data).
 
@@ -54,6 +54,22 @@ storing the password; use `pyedookit.refresh(session)` to renew the
 short-lived edookit session from the long-lived Plus4U cookie, and fall back
 to `login()` only when `refresh()` raises `AuthError`.
 
+Lesson times are timezone-aware (`pyedookit.PORTAL_TZ`, Europe/Prague).
+
+Errors all derive from `EdookitError`:
+
+| Exception | Meaning | What to do |
+|---|---|---|
+| `SessionExpired` | short-lived edookit session aged out | `refresh()` and retry |
+| `AuthError` | bad credentials, or the Plus4U cookie expired | full `login()` |
+| `EdookitConnectionError` | network error or 30 s timeout | retry later |
+| `ParseError` | portal markup changed | parser needs updating |
+
+`login()`, `refresh()` and `EdookitClient` all accept an optional
+`http: aiohttp.ClientSession` to reuse. Cookies are handled by hand, so
+create that session with `cookie_jar=aiohttp.DummyCookieJar()`; a session
+with a real cookie jar would also store and resend the portal's cookies.
+
 ## Development
 
 ```bash
@@ -62,3 +78,10 @@ uv run pytest
 uv run ruff check .
 uv run mypy src
 ```
+
+## Releasing
+
+Bump `version` in `pyproject.toml`, then push a `vX.Y.Z` tag. The
+`Publish to PyPI` workflow tests, builds and uploads using PyPI trusted
+publishing, which has to be configured once on pypi.org for this repository
+and the `pypi` environment.

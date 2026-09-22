@@ -1,10 +1,11 @@
+import aiohttp
 import pytest
 
 from pyedookit.client import EdookitClient
-from pyedookit.exceptions import SessionExpired
+from pyedookit.exceptions import EdookitConnectionError, SessionExpired
 from pyedookit.session import Session
 
-from .fakes import FakeClientSession, ok, redirect
+from .fakes import FailingResponse, FakeClientSession, ok, redirect
 
 SCHOOL = "zs-example"
 TIMETABLE_URL = f"https://{SCHOOL}.edookit.net/timetable/"
@@ -50,3 +51,23 @@ async def test_get_returns_body_on_success():
     html = await client.fetch_timetable_html()
 
     assert html == "<html>tt</html>"
+
+
+@pytest.mark.asyncio
+async def test_get_raises_connection_error_on_timeout():
+    fake = FakeClientSession([("GET", TIMETABLE_URL, FailingResponse(TimeoutError()))])
+    client = EdookitClient(SESSION, http=fake)
+
+    with pytest.raises(EdookitConnectionError):
+        await client.fetch_timetable_html()
+
+
+@pytest.mark.asyncio
+async def test_get_raises_connection_error_on_client_error():
+    fake = FakeClientSession(
+        [("GET", TIMETABLE_URL, FailingResponse(aiohttp.ClientConnectionError("reset")))]
+    )
+    client = EdookitClient(SESSION, http=fake)
+
+    with pytest.raises(EdookitConnectionError):
+        await client.fetch_timetable_html()

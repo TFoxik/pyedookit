@@ -1,20 +1,28 @@
 from __future__ import annotations
 
+import logging
 import re
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 
 from bs4 import BeautifulSoup, Tag
 
 from ..exceptions import ParseError
-from ..models import Lesson, Term
+from ..models import PORTAL_TZ, Lesson, Term
 
 _DATE_RE = re.compile(r"(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})")
 _TIME_RANGE_RE = re.compile(r"(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})")
 _TERM_ID_RE = re.compile(r"termSelector-new=(\d+)")
 _NOTE_PREFIX = "Učivo:"
 
+# The portal replaces the date with a word for recent days, e.g.
+# "Dnes , 8:00 – 8:45" (confirmed for Včera/Dnes; Zítra is assumed).
+_RELATIVE_DAYS = {"včera": -1, "dnes": 0, "zítra": 1}
+_RELATIVE_DAY_RE = re.compile(r"^\s*(včera|dnes|zítra)\b", re.IGNORECASE)
 
-def parse_timetable(html: str) -> list[Lesson]:
+_LOGGER = logging.getLogger(__name__)
+
+
+def parse_timetable(html: str, today: date | None = None) -> list[Lesson]:
     """Parse the hidden `.lesson-info` detail blocks on a rendered `/timetable/` page.
 
     Confirmed against a real portal capture: the *visible* week grid is an
@@ -27,6 +35,10 @@ def parse_timetable(html: str) -> list[Lesson]:
     need a day-column or week_start argument at all since each block already
     carries its own date.
 
+    Yesterday's and today's lessons carry "Včera"/"Dnes" instead of a date;
+    those resolve against `today`, which defaults to the current date in
+    `PORTAL_TZ`.
+
     Cancelled/substituted lessons could not be confirmed: the captured week
     had none, so `is_changed`/`is_cancelled` are always False for now. Fix
     once a real capture has one - see the parser test file for the exact gap.
@@ -36,8 +48,16 @@ def parse_timetable(html: str) -> list[Lesson]:
     if not blocks:
         raise ParseError("no lesson-info blocks found on timetable page")
 
-    lessons = [_parse_lesson_info(block) for block in blocks]
-    return [lesson for lesson in lessons if lesson is not None]
+    if today is None:
+        today = datetime.now(PORTAL_TZ).date()
+    lessons = []
+    for block in blocks:
+        lesson = _parse_lesson_info(block, today)
+        if lesson is None:
+            _LOGGER.warning("skipping unparseable lesson block %s", block.get("id"))
+        else:
+            lessons.append(lesson)
+    return lessons
 
 
 def parse_terms(html: str) -> list[Term]:
@@ -57,20 +77,18 @@ def parse_terms(html: str) -> list[Term]:
     return terms
 
 
-def _parse_lesson_info(block: Tag) -> Lesson | None:
+def _parse_lesson_info(block: Tag, today: date) -> Lesson | None:
     fields = block.find_all("div", recursive=False)
     datetime_div = next((f for f in fields if f.select_one(".date_time")), None)
     if datetime_div is None:
         return None
 
     text = datetime_div.get_text(" ", strip=True)
-    date_match = _DATE_RE.search(text)
+    lesson_date = _lesson_date(text, today)
     time_match = _TIME_RANGE_RE.search(text)
-    if not date_match or not time_match:
+    if lesson_date is None or not time_match:
         return None
-    day, month, year = (int(g) for g in date_match.groups())
     sh, sm, eh, em = (int(g) for g in time_match.groups())
-    lesson_date = date(year, month, day)
 
     # Field order after the date/time div is fixed on every lesson observed:
     # "{code} - {group}", full subject name, teacher(s), room, curriculum
@@ -90,11 +108,20 @@ def _parse_lesson_info(block: Tag) -> Lesson | None:
     _, _, group = code_group.partition(" - ")
 
     return Lesson(
-        start=datetime.combine(lesson_date, time(sh, sm)),
-        end=datetime.combine(lesson_date, time(eh, em)),
+        start=datetime.combine(lesson_date, time(sh, sm), tzinfo=PORTAL_TZ),
+        end=datetime.combine(lesson_date, time(eh, em), tzinfo=PORTAL_TZ),
         subject=subject or code_group,
         teacher=teacher or None,
         room=room or None,
         group=group or None,
         note=note,
     )
+
+
+def _lesson_date(text: str, today: date) -> date | None:
+    if relative := _RELATIVE_DAY_RE.match(text):
+        return today + timedelta(days=_RELATIVE_DAYS[relative.group(1).lower()])
+    if absolute := _DATE_RE.search(text):
+        day, month, year = (int(g) for g in absolute.groups())
+        return date(year, month, day)
+    return None

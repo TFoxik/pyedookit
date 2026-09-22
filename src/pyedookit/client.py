@@ -3,7 +3,7 @@ from __future__ import annotations
 import aiohttp
 
 from . import auth
-from .exceptions import SessionExpired
+from .exceptions import EdookitConnectionError, SessionExpired
 from .models import Lesson, Term
 from .parsers.timetable import parse_terms, parse_timetable
 from .session import Session
@@ -19,9 +19,11 @@ class EdookitClient:
     the current session has gone stale and raises `SessionExpired` so the
     caller can refresh and retry.
 
-    Pass `http` to reuse an existing `aiohttp.ClientSession` (e.g. Home
-    Assistant's shared session) across requests instead of opening a new
-    connection per call; otherwise one is created and closed per request.
+    Pass `http` to reuse an existing `aiohttp.ClientSession` across requests
+    instead of opening a new connection per call; otherwise one is created
+    and closed per request. Cookies are sent by hand, so give it a
+    `aiohttp.DummyCookieJar()` rather than a shared session whose jar would
+    also collect the portal's cookies.
     """
 
     def __init__(self, session: Session, http: aiohttp.ClientSession | None = None) -> None:
@@ -65,7 +67,16 @@ class EdookitClient:
         # target even when that target is a different host - so an expired
         # session's redirect to Plus4U must never be followed with them
         # attached. Any redirect at all means the session isn't good anymore.
-        async with http.get(url, params=params, headers=headers, allow_redirects=False) as resp:
-            if resp.status in auth.REDIRECT_STATUSES or auth.is_login_url(str(resp.url)):
-                raise SessionExpired("edookit session has expired")
-            return await resp.text()
+        try:
+            async with http.get(
+                url,
+                params=params,
+                headers=headers,
+                allow_redirects=False,
+                timeout=auth.REQUEST_TIMEOUT,
+            ) as resp:
+                if resp.status in auth.REDIRECT_STATUSES or auth.is_login_url(str(resp.url)):
+                    raise SessionExpired("edookit session has expired")
+                return await resp.text()
+        except (aiohttp.ClientError, TimeoutError) as err:
+            raise EdookitConnectionError(f"request to {url} failed: {err}") from err
