@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime
+from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 # The portal renders wall-clock times with no zone; every Edookit school is
@@ -46,3 +47,20 @@ class SchoolEvent:
     @property
     def all_day(self) -> bool:
         return not isinstance(self.start, datetime)
+
+
+@dataclass(frozen=True, slots=True)
+class PaymentRequest:
+    title: str
+    amount: Decimal
+    currency: str
+    is_paid: bool
+
+
+@dataclass(frozen=True, slots=True)
+class Payments:
+    paid: Decimal
+    remaining: Decimal
+    overpaid: Decimal
+    currency: str
+    requests: list[PaymentRequest]
