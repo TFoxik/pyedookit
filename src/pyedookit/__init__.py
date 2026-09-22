@@ -1,5 +1,5 @@
 from .auth import login, refresh
-from .client import EdookitClient
+from .client import CAPTURE_PAGES, EdookitClient
 from .exceptions import (
     AuthError,
     EdookitConnectionError,
@@ -7,10 +7,12 @@ from .exceptions import (
     ParseError,
     SessionExpired,
 )
-from .models import PORTAL_TZ, Lesson, Student, Term
+from .models import PORTAL_TZ, Lesson, PaymentRequest, Payments, SchoolEvent, Student, Term
+from .parsers.fingerprint import content_fingerprint
 from .session import Session
 
 __all__ = [
+    "CAPTURE_PAGES",
     "PORTAL_TZ",
     "AuthError",
     "EdookitClient",
@@ -18,10 +20,14 @@ __all__ = [
     "EdookitError",
     "Lesson",
     "ParseError",
+    "PaymentRequest",
+    "Payments",
+    "SchoolEvent",
     "Session",
     "SessionExpired",
     "Student",
     "Term",
+    "content_fingerprint",
     "login",
     "refresh",
 ]

@@ -12,7 +12,7 @@ changes its markup.
 
 ## Status
 
-v0.2.0 - timetable only. Verified end-to-end against a real portal
+v0.3.0 - timetable, upcoming school events and payments. Verified end-to-end against a real portal
 (login, session-settling after the OIDC callback, and the timetable parser
 all confirmed working on real data).
 
@@ -48,6 +48,16 @@ async def main():
 
 asyncio.run(main())
 ```
+
+`client.get_events()` returns upcoming school events (`SchoolEvent`, all-day
+events have `date` start/end with an inclusive end), and `client.get_payments()`
+returns the family's payment totals and requests (`Payments`, amounts as
+`Decimal`). Only paid requests have been seen on a real portal so far; a request
+without the "accepted" marker is reported as unpaid.
+
+`client.fetch_page(name)` returns the raw HTML of a page that has no parser yet
+(`CAPTURE_PAGES`: assignments, exams, inbox, consents), and
+`content_fingerprint(html)` tells you when such a page's content changed.
 
 Persist `session.to_json()` / `Session.from_json()` between runs instead of
 storing the password; use `pyedookit.refresh(session)` to renew the

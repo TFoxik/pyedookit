@@ -4,11 +4,22 @@ import aiohttp
 
 from . import auth
 from .exceptions import EdookitConnectionError, SessionExpired
-from .models import Lesson, Term
+from .models import Lesson, Payments, SchoolEvent, Term
+from .parsers.events import parse_events
+from .parsers.payments import parse_payments
 from .parsers.timetable import parse_terms, parse_timetable
 from .session import Session
 
 _TIMETABLE_PATH = "/timetable/"
+_EVENTS_PATH = "/timetable/upcoming"
+_PAYMENTS_PATH = "/payments/"
+
+CAPTURE_PAGES: dict[str, str] = {
+    "assignments": "/assignments/",
+    "exams": "/exams/",
+    "inbox": "/overview/updates",
+    "consents": "/consents/",
+}
 
 
 class EdookitClient:
@@ -46,6 +57,20 @@ class EdookitClient:
         """Raw `/timetable/` HTML for one week - also used by
         scripts/capture_fixtures.py, so the request shape lives in one place."""
         return await self._get(_TIMETABLE_PATH, params={"familyTimetable-value": week_offset})
+
+    async def get_events(self) -> list[SchoolEvent]:
+        return parse_events(await self._get(_EVENTS_PATH))
+
+    async def get_payments(self) -> Payments:
+        return parse_payments(await self._get(_PAYMENTS_PATH))
+
+    async def fetch_page(self, name: str) -> str:
+        """Raw HTML of one of `CAPTURE_PAGES`, for pages without a parser yet."""
+        try:
+            path = CAPTURE_PAGES[name]
+        except KeyError:
+            raise ValueError(f"{name!r} is not one of {sorted(CAPTURE_PAGES)}") from None
+        return await self._get(path)
 
     async def _get(self, path: str, params: dict[str, int] | None = None) -> str:
         url = f"{self._session.base_url}{path}"
