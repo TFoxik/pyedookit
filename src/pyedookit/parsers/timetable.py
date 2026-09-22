@@ -112,4 +112,3 @@ def _parse_lesson_info(block: Tag, today: date) -> Lesson | None:
         group=group or None,
         note=note,
     )
-

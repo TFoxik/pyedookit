@@ -8,7 +8,7 @@ from .exceptions import (
     SessionExpired,
 )
 from .models import PORTAL_TZ, Lesson, PaymentRequest, Payments, SchoolEvent, Student, Term
-from .parsers.fingerprint import content_fingerprint, has_portal_content
+from .parsers.fingerprint import content_fingerprint
 from .session import Session
 
 __all__ = [
@@ -28,7 +28,6 @@ __all__ = [
     "Student",
     "Term",
     "content_fingerprint",
-    "has_portal_content",
     "login",
     "refresh",
 ]

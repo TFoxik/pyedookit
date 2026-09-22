@@ -1,4 +1,4 @@
-from pyedookit.parsers.fingerprint import content_fingerprint, has_portal_content
+from pyedookit.parsers.fingerprint import content_fingerprint
 
 EMPTY = """<html><body><nav>menu 3</nav><section class="content">
 <h1>Domácí úkoly</h1><p>Úkoly na dnešek</p><p>Žádné úkoly</p>
@@ -23,6 +23,5 @@ def test_new_item_changes_fingerprint():
     assert content_fingerprint(with_item) != content_fingerprint(EMPTY)
 
 
-def test_portal_pages_have_content_error_pages_do_not():
-    assert has_portal_content(EMPTY)
-    assert not has_portal_content("<html><body><h1>503 Service Unavailable</h1></body></html>")
+def test_error_pages_have_no_fingerprint():
+    assert content_fingerprint("<html><body><h1>503 Service Unavailable</h1></body></html>") is None
