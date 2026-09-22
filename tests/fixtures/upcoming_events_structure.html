@@ -1,0 +1,62 @@
+<!--
+Synthetic fixture. Its element structure matches a real /timetable/upcoming
+capture from 2026-09-22 (div.events_table rows, the gridLabel header row, the
+li.c1/c2/c3 columns, the date shapes and the event=<id> links). All names,
+titles and ids are placeholders.
+-->
+<html><body>
+<section class="content">
+<h2>Nadcházející události</h2>
+<div class="boxes1">
+<div class="events_table spacy-grid">
+  <div class="gridLabel" id="gridLabel">
+    <ul class="unclickable gridLabel table_row">
+      <li class="c1"><h3 class="grid-label">Datum události</h3></li>
+      <li class="c2"><h3 class="grid-label">Popis události</h3></li>
+      <li class="c3"><h3 class="grid-label">Vytvořeno</h3></li>
+    </ul>
+  </div>
+  <ul class="table_row" onclick="window.location.href = '/timetable/detail?event=5001'">
+    <li class="c1"><h3 class="responsive-label">Datum události</h3>
+      <p><b>23. 9., od <span class="date_time">13:30</span> do <span class="date_time">15:30</span></b></p>
+      <p>Žák A</p></li>
+    <li class="c2"><h3 class="responsive-label">Popis události</h3><p></p>
+      <div class="bold"><a href="/timetable/detail?event=5001"><span>ŠD Pasování na čtenáře</span></a></div><p></p></li>
+    <li class="c3"><h3 class="responsive-label">Vytvořeno</h3>
+      <div class="smaller"><p><b>Učitelka B</b></p><p>14. 9. 2026, <span class="date_time">10:54</span></p></div></li>
+  </ul>
+  <ul class="table_row" onclick="window.location.href = '/timetable/detail?event=5002'">
+    <li class="c1"><h3 class="responsive-label">Datum události</h3>
+      <p><b>24. 9., od <span class="date_time">10:00</span> do <span class="date_time">11:40</span></b></p>
+      <p>Žák A, 1.B</p></li>
+    <li class="c2"><h3 class="responsive-label">Popis události</h3><p></p>
+      <div class="bold"><a href="/timetable/detail?event=5002"><span>Divadlo</span></a></div>
+      <p>Představení "Kocour v botách" v KD</p></li>
+    <li class="c3"><h3 class="responsive-label">Vytvořeno</h3>
+      <div class="smaller"><p><b>Učitelka C</b></p><p>15. 9. 2026, <span class="date_time">09:12</span></p></div></li>
+  </ul>
+  <ul class="table_row" onclick="window.location.href = '/timetable/detail?event=5003'">
+    <li class="c1"><h3 class="responsive-label">Datum události</h3><p><b>28. 9.</b></p><p>Žák A, 1.B</p></li>
+    <li class="c2"><h3 class="responsive-label">Popis události</h3><p></p>
+      <div class="bold"><a href="/timetable/detail?event=5003"><span>Den české státnosti</span></a></div><p></p></li>
+    <li class="c3"><h3 class="responsive-label">Vytvořeno</h3>
+      <div class="smaller"><p><b>Ředitel D</b></p><p>1. 9. 2026, <span class="date_time">08:00</span></p></div></li>
+  </ul>
+  <ul class="table_row" onclick="window.location.href = '/timetable/detail?event=5004'">
+    <li class="c1"><h3 class="responsive-label">Datum události</h3><p><b>od 23. 12. do 3. 1. 2027</b></p><p>Žák A, 1.B</p></li>
+    <li class="c2"><h3 class="responsive-label">Popis události</h3><p></p>
+      <div class="bold"><a href="/timetable/detail?event=5004"><span>Vánoční prázdniny</span></a></div><p></p></li>
+    <li class="c3"><h3 class="responsive-label">Vytvořeno</h3>
+      <div class="smaller"><p><b>Ředitel D</b></p><p>1. 9. 2026, <span class="date_time">08:00</span></p></div></li>
+  </ul>
+  <ul class="table_row" onclick="window.location.href = '/timetable/detail?event=5005'">
+    <li class="c1"><h3 class="responsive-label">Datum události</h3><p><b>29. 1. 2027</b></p><p>Žák A, 1.B</p></li>
+    <li class="c2"><h3 class="responsive-label">Popis události</h3><p></p>
+      <div class="bold"><a href="/timetable/detail?event=5005"><span>Pololetní prázdniny</span></a></div><p></p></li>
+    <li class="c3"><h3 class="responsive-label">Vytvořeno</h3>
+      <div class="smaller"><p><b>Ředitel D</b></p><p>1. 9. 2026, <span class="date_time">08:00</span></p></div></li>
+  </ul>
+</div>
+</div>
+</section>
+</body></html>

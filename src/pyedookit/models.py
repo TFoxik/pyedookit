@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 # The portal renders wall-clock times with no zone; every Edookit school is
@@ -32,3 +32,17 @@ class Term:
 class Student:
     id: str
     name: str
+
+
+@dataclass(frozen=True, slots=True)
+class SchoolEvent:
+    id: str
+    title: str
+    start: datetime | date
+    end: datetime | date
+    description: str | None = None
+    created_by: str | None = None
+
+    @property
+    def all_day(self) -> bool:
+        return not isinstance(self.start, datetime)
