@@ -94,6 +94,72 @@ async def test_login_success_extracts_edookit_and_plus4u_cookies(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_login_keeps_cookies_that_simplecookie_would_drop(monkeypatch):
+    # Python's SimpleCookie silently discards a whole Set-Cookie header with
+    # an attribute it doesn't know (e.g. Partitioned) or a quote/space in the
+    # value - that lost the long-lived uoid.ps cookie on a real login, so
+    # the ~19-day silent refresh never worked.
+    _install_fake_session(
+        monkeypatch,
+        [
+            _discovery_route(),
+            ("GET", AUTH_URL_PREFIX, redirect(LOGIN_PAGE_URL)),
+            (
+                "POST",
+                PASSWORD_URL,
+                redirect(
+                    CONTINUE_URL,
+                    raw_set_cookies=[
+                        "uoid.ps=persist1; Path=/; Secure; HttpOnly; SameSite=None; Partitioned",
+                        'uoid.s="quoted value"; Path=/; Secure',
+                        "uoid.bs=b; Path=/",
+                    ],
+                ),
+            ),
+            ("GET", CONTINUE_URL, redirect(f"{CALLBACK_URL}?code=abc123")),
+            ("GET", CALLBACK_URL, redirect(DASHBOARD_URL)),
+            ("GET", DASHBOARD_URL, ok(DASHBOARD_URL, set_cookies={"PHPSESSID": "sess1"})),
+            _settle_route(),
+        ],
+    )
+
+    session = await auth.login(SCHOOL, "user@example.com", "hunter2")
+
+    assert session.plus4u_cookies == {
+        "uoid.ps": "persist1",
+        "uoid.s": '"quoted value"',
+        "uoid.bs": "b",
+    }
+
+
+@pytest.mark.asyncio
+async def test_cookie_cleared_by_the_server_is_dropped(monkeypatch):
+    _install_fake_session(
+        monkeypatch,
+        [
+            _discovery_route(),
+            ("GET", AUTH_URL_PREFIX, redirect(LOGIN_PAGE_URL, set_cookies={"uoid.old": "x"})),
+            (
+                "POST",
+                PASSWORD_URL,
+                redirect(
+                    CONTINUE_URL,
+                    raw_set_cookies=["uoid.old=; Max-Age=0; Path=/", "uoid.ps=p; Path=/"],
+                ),
+            ),
+            ("GET", CONTINUE_URL, redirect(f"{CALLBACK_URL}?code=abc123")),
+            ("GET", CALLBACK_URL, redirect(DASHBOARD_URL)),
+            ("GET", DASHBOARD_URL, ok(DASHBOARD_URL, set_cookies={"PHPSESSID": "sess1"})),
+            _settle_route(),
+        ],
+    )
+
+    session = await auth.login(SCHOOL, "user@example.com", "hunter2")
+
+    assert session.plus4u_cookies == {"uoid.ps": "p"}
+
+
+@pytest.mark.asyncio
 async def test_login_raises_auth_error_on_bad_credentials(monkeypatch):
     _install_fake_session(
         monkeypatch,

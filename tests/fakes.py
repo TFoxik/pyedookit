@@ -37,18 +37,32 @@ class FakeResponse:
 
 
 def _response(
-    status: int, url: str, set_cookies: dict[str, str] | None = None, body: str = "", **headers: str
+    status: int,
+    url: str,
+    set_cookies: dict[str, str] | None = None,
+    body: str = "",
+    raw_set_cookies: list[str] | None = None,
+    **headers: str,
 ) -> FakeResponse:
-    cookies: SimpleCookie = SimpleCookie()
+    """Builds `.cookies` from the Set-Cookie headers exactly as aiohttp does,
+    including SimpleCookie silently dropping cookies it can't parse."""
+    all_headers: CIMultiDict[str] = CIMultiDict(headers)
     for key, value in (set_cookies or {}).items():
-        cookies[key] = value
-    return FakeResponse(
-        status=status, headers=CIMultiDict(headers), cookies=cookies, body=body, url=url
-    )
+        all_headers.add("Set-Cookie", f"{key}={value}; Path=/")
+    for raw in raw_set_cookies or []:
+        all_headers.add("Set-Cookie", raw)
+    cookies: SimpleCookie = SimpleCookie()
+    for header in all_headers.getall("Set-Cookie", []):
+        cookies.load(header)
+    return FakeResponse(status=status, headers=all_headers, cookies=cookies, body=body, url=url)
 
 
-def redirect(location: str, set_cookies: dict[str, str] | None = None) -> FakeResponse:
-    return _response(302, location, set_cookies, Location=location)
+def redirect(
+    location: str,
+    set_cookies: dict[str, str] | None = None,
+    raw_set_cookies: list[str] | None = None,
+) -> FakeResponse:
+    return _response(302, location, set_cookies, raw_set_cookies=raw_set_cookies, Location=location)
 
 
 def ok(

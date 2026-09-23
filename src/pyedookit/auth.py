@@ -3,7 +3,7 @@ from __future__ import annotations
 import json as _json
 import re
 import secrets
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncIterator, Iterable, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
@@ -86,6 +86,32 @@ def _callback_url(school: str) -> str:
     return f"{_school_base(school)}/user/oidc-login-callback"
 
 
+def _apply_set_cookies(headers: Iterable[str], jar: dict[str, str]) -> None:
+    """Record Set-Cookie headers into `jar` the way a browser would.
+
+    Parsed by hand instead of via aiohttp's `resp.cookies`: that uses
+    SimpleCookie, which silently drops a whole header when it meets an
+    attribute it doesn't know (e.g. `Partitioned`) or an unquoted space or
+    quote in the value - and that is how Plus4U's long-lived `uoid.ps`
+    cookie was lost, breaking the silent refresh. Values are kept verbatim
+    (quotes included) because that is what gets sent back.
+    """
+    for header in headers:
+        pair, _, attributes = header.partition(";")
+        name, sep, value = pair.partition("=")
+        name = name.strip()
+        if not sep or not name:
+            continue
+        expired = any(
+            attr.strip().lower().replace(" ", "") in ("max-age=0", "max-age=-1")
+            for attr in attributes.split(";")
+        )
+        if expired:
+            jar.pop(name, None)
+        else:
+            jar[name] = value.strip()
+
+
 def _cookie_header(cookies: Mapping[str, str]) -> str:
     return "; ".join(f"{k}={v}" for k, v in cookies.items())
 
@@ -160,9 +186,8 @@ async def _fetch(
                 allow_redirects=False,
                 timeout=REQUEST_TIMEOUT,
             ) as resp:
-                new_cookies = {key: morsel.value for key, morsel in resp.cookies.items()}
-                if new_cookies:
-                    cookies_by_host.setdefault(host, {}).update(new_cookies)
+                if set_cookies := resp.headers.getall("Set-Cookie", []):
+                    _apply_set_cookies(set_cookies, cookies_by_host.setdefault(host, {}))
 
                 is_redirect = resp.status in REDIRECT_STATUSES
                 location = resp.headers.get("Location")
