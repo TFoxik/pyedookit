@@ -256,6 +256,39 @@ async def test_refresh_success_reuses_plus4u_cookies_without_password(monkeypatc
 
 
 @pytest.mark.asyncio
+async def test_refresh_does_not_send_the_stale_edookit_session_to_the_login_page(monkeypatch):
+    # Confirmed on a real portal: /user/login with an expired edookit session
+    # cookie redirects to /oidc/logout instead of serving the page that holds
+    # the Plus4U client_id, so refresh failed on its very first request.
+    def login_page(headers: dict[str, str]):
+        if "PHPSESSID" in headers.get("Cookie", ""):
+            return redirect(f"https://{SCHOOL}.edookit.net/oidc/logout?performCallback=1")
+        return ok(LOGIN_URL, body=LOGIN_PAGE_HTML, set_cookies={"PHPSESSID": "fresh"})
+
+    stale = Session(
+        school=SCHOOL,
+        edookit_cookies={"PHPSESSID": "old", "uu.app.csrf": "old-csrf"},
+        plus4u_cookies={"uoid.ps": "p"},
+        csrf_token="old-csrf",
+    )
+    _install_fake_session(
+        monkeypatch,
+        [
+            ("GET", LOGIN_URL, login_page),
+            ("GET", AUTH_URL_PREFIX, redirect(f"{CALLBACK_URL}?code=fresh123")),
+            ("GET", CALLBACK_URL, redirect(DASHBOARD_URL)),
+            ("GET", DASHBOARD_URL, ok(DASHBOARD_URL, set_cookies={"uu.app.csrf": "csrf2"})),
+            _settle_route(),
+        ],
+    )
+
+    refreshed = await auth.refresh(stale)
+
+    assert refreshed.edookit_cookies == {"PHPSESSID": "fresh", "uu.app.csrf": "csrf2"}
+    assert refreshed.csrf_token == "csrf2"
+
+
+@pytest.mark.asyncio
 async def test_refresh_raises_auth_error_when_plus4u_cookie_expired(monkeypatch):
     stale = Session(
         school=SCHOOL,

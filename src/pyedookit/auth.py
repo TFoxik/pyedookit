@@ -356,10 +356,10 @@ async def refresh(session: Session, *, http: aiohttp.ClientSession | None = None
     `http` has the same cookie-jar requirement as in `login()`.
     """
     _validate_school(session.school)
-    cookies_by_host: CookiesByHost = {
-        _PLUS4U_HOST: dict(session.plus4u_cookies),
-        _school_host(session.school): dict(session.edookit_cookies),
-    }
+    # Only the Plus4U cookies: the portal answers /user/login with a redirect
+    # to /oidc/logout when it sees the expired edookit session, so the new
+    # edookit session is built from scratch, exactly like in login().
+    cookies_by_host: CookiesByHost = {_PLUS4U_HOST: dict(session.plus4u_cookies)}
     async with _http_session(http) as http:
         client_id = await _discover_client_id(http, session.school, cookies_by_host)
         state = secrets.token_urlsafe(16)

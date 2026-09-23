@@ -96,7 +96,9 @@ class FakeClientSession:
         for index, (route_method, url_prefix, response) in enumerate(self._routes):
             if route_method.upper() == method.upper() and str(url).startswith(url_prefix):
                 del self._routes[index]
-                return response
+                # A route may be a callable taking the request headers, for
+                # endpoints whose answer depends on the cookies sent.
+                return response(kwargs.get("headers") or {}) if callable(response) else response
         raise AssertionError(f"FakeClientSession: no route for {method} {url}")
 
     def get(self, url: str, **kwargs: object) -> FakeResponse:
