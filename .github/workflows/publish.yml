@@ -1,7 +1,7 @@
 name: Publish to PyPI
 
-# Uses PyPI trusted publishing: register this repo + workflow (no environment;
-# GitHub Free has none for private repos) on pypi.org first, no API token needed.
+# Uses PyPI trusted publishing: register this repo + workflow + the "pypi"
+# environment as a trusted publisher on pypi.org first, no API token needed.
 on:
   push:
     tags: ["v*"]
@@ -23,6 +23,7 @@ jobs:
   publish:
     needs: build
     runs-on: ubuntu-latest
+    environment: pypi
     permissions:
       id-token: write
     steps:
