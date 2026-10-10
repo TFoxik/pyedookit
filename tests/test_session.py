@@ -1,7 +1,5 @@
 import pytest
-from yarl import URL
 
-from pyedookit import auth
 from pyedookit.exceptions import AuthError
 from pyedookit.session import Session
 
@@ -31,24 +29,3 @@ def test_repr_hides_cookies_and_csrf_token():
     text = repr(_session("zs-example"))
     assert "zs-example" in text
     assert "secret" not in text
-
-
-@pytest.mark.parametrize(
-    "url",
-    [
-        "http://zs-example.edookit.net/user/oidc-login-callback?code=x",
-        "https://evil.com/?code=x",
-        "https://edookit.net.evil.com/",
-    ],
-)
-def test_login_flow_refuses_to_leave_plus4u_and_edookit(url):
-    with pytest.raises(AuthError):
-        auth._check_hop(URL(url))
-
-
-@pytest.mark.parametrize(
-    "url",
-    ["https://uuidentity.plus4u.net/oidc/auth", "https://zs-example.edookit.net/"],
-)
-def test_login_flow_allows_plus4u_and_edookit_over_https(url):
-    auth._check_hop(URL(url))

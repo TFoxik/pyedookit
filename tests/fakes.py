@@ -58,9 +58,20 @@ def redirect(
 
 
 def ok(
-    url: str, set_cookies: dict[str, str] | None = None, body: str = "<html>ok</html>"
+    url: str,
+    set_cookies: dict[str, str] | None = None,
+    body: str = "<html>ok</html>",
+    raw_set_cookies: list[str] | None = None,
+    content_type: str = "text/html; charset=utf-8",
 ) -> FakeResponse:
-    return _response(200, url, set_cookies, body=body)
+    return _response(
+        200,
+        url,
+        set_cookies,
+        body=body,
+        raw_set_cookies=raw_set_cookies,
+        **{"Content-Type": content_type},
+    )
 
 
 def rejected(status: int = 401) -> FakeResponse:

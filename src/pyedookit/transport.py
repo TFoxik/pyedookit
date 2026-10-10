@@ -1,9 +1,22 @@
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import AsyncIterator, Iterable, Mapping
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from email.utils import parsedate_to_datetime
+
+import aiohttp
+from yarl import URL
+
+from .exceptions import AuthError, EdookitConnectionError
+
+REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
+REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=30)
+_MAX_REDIRECTS = 5
+# Every hop stays on these over https; anything else means a response was
+# tampered with, and must not receive cookies or an authorization code.
+_ALLOWED_HOST_SUFFIXES = (".plus4u.net", ".edookit.net")
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,3 +135,94 @@ def _parse_set_cookie(header: str, now: datetime) -> tuple[str, Cookie] | None:
     elif expires is not None and expires.tzinfo is None:
         expires = expires.replace(tzinfo=UTC)
     return name, Cookie(value.strip(), expires)
+
+
+@dataclass(frozen=True, slots=True)
+class Response:
+    status: int
+    url: str
+    text: str
+    location: str | None
+    content_type: str
+
+    @property
+    def is_redirect(self) -> bool:
+        return self.status in REDIRECT_STATUSES
+
+
+def check_hop(url: URL) -> None:
+    host = url.host or ""
+    if url.scheme != "https" or not host.endswith(_ALLOWED_HOST_SUFFIXES):
+        raise AuthError(f"request tried to leave Plus4U/Edookit (to {url.scheme}://{host})")
+
+
+async def request(
+    http: aiohttp.ClientSession,
+    method: str,
+    url: str,
+    cookies: CookieStore,
+    *,
+    headers: Mapping[str, str] | None = None,
+    json: dict[str, object] | None = None,
+    params: Mapping[str, str | int] | None = None,
+    follow_redirects: bool = False,
+) -> Response:
+    """One request (optionally chasing redirects), keeping `cookies` up to date.
+
+    Redirects are never left to aiohttp: older versions forward a manually
+    set Cookie header to a redirect target on another host. Each hop sends
+    only its own host's cookies, and `headers` only go to the first hop.
+    """
+    current_url, current_method = url, method
+    current_json, current_params, extra_headers = json, params, headers
+    for _ in range(_MAX_REDIRECTS + 1):
+        parsed = URL(current_url)
+        check_hop(parsed)
+        host = parsed.host or ""
+        request_headers = dict(extra_headers or {})
+        if cookie_header := cookies.header(host):
+            request_headers["Cookie"] = cookie_header
+        try:
+            async with http.request(
+                current_method,
+                current_url,
+                params=current_params,
+                json=current_json,
+                headers=request_headers,
+                allow_redirects=False,
+                timeout=REQUEST_TIMEOUT,
+            ) as resp:
+                cookies.update(host, resp.headers.getall("Set-Cookie", []))
+                response = Response(
+                    status=resp.status,
+                    url=str(resp.url),
+                    text="" if resp.status in REDIRECT_STATUSES else await resp.text(),
+                    location=resp.headers.get("Location"),
+                    content_type=resp.headers.get("Content-Type", ""),
+                )
+        except (aiohttp.ClientError, TimeoutError) as err:
+            raise EdookitConnectionError(f"request to {host} failed: {err}") from err
+
+        if not (follow_redirects and response.is_redirect and response.location):
+            return response
+        current_url = str(parsed.join(URL(response.location)))
+        current_method, current_json, current_params, extra_headers = "GET", None, None, None
+
+    raise AuthError("too many redirects while following the Plus4U/edookit login flow")
+
+
+def _new_http_session() -> aiohttp.ClientSession:
+    # Cookies live in CookieStore, never in aiohttp's jar; tests replace this
+    # factory with a fake session instead of mocking ClientSession internals.
+    return aiohttp.ClientSession(cookie_jar=aiohttp.DummyCookieJar())
+
+
+@asynccontextmanager
+async def http_session(
+    http: aiohttp.ClientSession | None,
+) -> AsyncIterator[aiohttp.ClientSession]:
+    if http is not None:
+        yield http
+        return
+    async with _new_http_session() as own:
+        yield own
