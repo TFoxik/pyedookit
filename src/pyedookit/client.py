@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
+from collections.abc import Callable
 
 import aiohttp
 
@@ -12,6 +14,8 @@ from .parsers.events import parse_events
 from .parsers.payments import parse_payments
 from .parsers.timetable import parse_terms, parse_timetable
 from .session import Session
+
+_LOGGER = logging.getLogger(__name__)
 
 _TIMETABLE_PATH = "/timetable/"
 _EVENTS_PATH = "/timetable/upcoming"
@@ -28,10 +32,10 @@ CAPTURE_PAGES: dict[str, str] = {
 class EdookitClient:
     """Fetches parsed data from one school's Edookit parent portal.
 
-    Holds a `Session` that the caller is responsible for persisting and
-    refreshing (see `pyedookit.auth.refresh`); this class only detects when
-    the current session has gone stale and raises `SessionExpired` so the
-    caller can refresh and retry.
+    Renews an expired edookit session by itself from the Plus4U sign-in and
+    retries once; `on_session_update` receives each renewed `Session` so the
+    caller can persist it. `AuthError` means the Plus4U sign-in expired too
+    and a full `login()` is needed.
 
     Pass `http` to reuse an existing `aiohttp.ClientSession` across requests
     instead of opening a new connection per call; otherwise one is created
@@ -43,9 +47,17 @@ class EdookitClient:
     the caller's event loop.
     """
 
-    def __init__(self, session: Session, http: aiohttp.ClientSession | None = None) -> None:
+    def __init__(
+        self,
+        session: Session,
+        http: aiohttp.ClientSession | None = None,
+        *,
+        on_session_update: Callable[[Session], None] | None = None,
+    ) -> None:
         self._session = session
         self._http = http
+        self._on_session_update = on_session_update
+        self._renew_lock = asyncio.Lock()
 
     @property
     def session(self) -> Session:
@@ -79,6 +91,22 @@ class EdookitClient:
 
     async def _get(self, path: str, params: dict[str, int] | None = None) -> str:
         session = self._session
+        try:
+            return await self._fetch(session, path, params)
+        except SessionExpired:
+            _LOGGER.debug("Edookit session expired, renewing it")
+            await self._renew(session)
+        return await self._fetch(self._session, path, params)
+
+    async def _renew(self, stale: Session) -> None:
+        async with self._renew_lock:
+            if self._session is not stale:
+                return
+            self._session = await auth.refresh(stale, http=self._http)
+            if self._on_session_update is not None:
+                self._on_session_update(self._session)
+
+    async def _fetch(self, session: Session, path: str, params: dict[str, int] | None) -> str:
         async with transport.http_session(self._http) as http:
             response = await transport.request(
                 http,

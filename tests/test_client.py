@@ -1,11 +1,14 @@
+import asyncio
 from decimal import Decimal
 from pathlib import Path
+from unittest.mock import AsyncMock
 
 import aiohttp
 import pytest
 
+from pyedookit import auth
 from pyedookit.client import EdookitClient
-from pyedookit.exceptions import EdookitConnectionError, SessionExpired
+from pyedookit.exceptions import AuthError, EdookitConnectionError, SessionExpired
 from pyedookit.session import Session
 
 from .fakes import FailingResponse, FakeClientSession, ok, redirect
@@ -18,28 +21,107 @@ SESSION = Session.from_cookies(
 )
 
 
+EXPIRED = '{"redirect":"https://zs-example.edookit.net/user/login?message=1","state":[]}'
+
+
+def _expired() -> object:
+    return ok(TIMETABLE_URL, body=EXPIRED, content_type="application/json")
+
+
+def _renewed(cookie: str) -> Session:
+    return Session.from_cookies(SCHOOL, edookit={"PHPSESSID": cookie}, plus4u={"uoid.ps": "p"})
+
+
 @pytest.mark.asyncio
-async def test_get_raises_session_expired_on_any_redirect_without_following_it():
+async def test_a_redirect_is_never_followed_and_counts_as_expired(monkeypatch):
     # A redirect must never be followed here: our Cookie header is set
     # manually, and following it would forward the school's session cookie
     # to whatever host the redirect points at (see transport.request).
+    monkeypatch.setattr(auth, "refresh", AsyncMock(side_effect=AuthError("stop here")))
     fake = FakeClientSession(
         [("GET", TIMETABLE_URL, redirect("https://uuidentity.plus4u.net/oidc/auth"))]
+    )
+
+    with pytest.raises(AuthError):
+        await EdookitClient(SESSION, http=fake).fetch_timetable_html()
+
+
+@pytest.mark.asyncio
+async def test_get_raises_session_expired_on_the_ajax_login_redirect(monkeypatch):
+    monkeypatch.setattr(auth, "refresh", AsyncMock(side_effect=AuthError("stop here")))
+    response = ok(TIMETABLE_URL, body=EXPIRED, content_type="application/json; charset=utf-8")
+    client = EdookitClient(SESSION, http=FakeClientSession([("GET", TIMETABLE_URL, response)]))
+
+    with pytest.raises(AuthError):
+        await client.fetch_timetable_html()
+
+
+@pytest.mark.asyncio
+async def test_expired_session_is_renewed_reported_and_retried(monkeypatch):
+    refresh = AsyncMock(return_value=_renewed("new"))
+    monkeypatch.setattr(auth, "refresh", refresh)
+    updates: list[Session] = []
+    fake = FakeClientSession(
+        [("GET", TIMETABLE_URL, _expired()), ("GET", TIMETABLE_URL, ok(TIMETABLE_URL, body="tt"))]
+    )
+    client = EdookitClient(SESSION, http=fake, on_session_update=updates.append)
+
+    assert await client.fetch_timetable_html() == "tt"
+    assert [s.cookies.get(f"{SCHOOL}.edookit.net", "PHPSESSID") for s in updates] == ["new"]
+    assert client.session is updates[0]
+    refresh.assert_awaited_once_with(SESSION, http=fake)
+
+
+@pytest.mark.asyncio
+async def test_still_expired_after_renewal_raises_without_looping(monkeypatch):
+    refresh = AsyncMock(return_value=_renewed("new"))
+    monkeypatch.setattr(auth, "refresh", refresh)
+    fake = FakeClientSession(
+        [("GET", TIMETABLE_URL, _expired()), ("GET", TIMETABLE_URL, _expired())]
     )
     client = EdookitClient(SESSION, http=fake)
 
     with pytest.raises(SessionExpired):
         await client.fetch_timetable_html()
+    refresh.assert_awaited_once()
 
 
 @pytest.mark.asyncio
-async def test_get_raises_session_expired_on_the_ajax_login_redirect():
-    response = ok(TIMETABLE_URL, body=f'{{"redirect":"https://{SCHOOL}.edookit.net/user/login?message=1","state":[]}}')
-    response.headers["Content-Type"] = "application/json; charset=utf-8"
-    client = EdookitClient(SESSION, http=FakeClientSession([("GET", TIMETABLE_URL, response)]))
+async def test_expired_plus4u_sign_in_raises_auth_error(monkeypatch):
+    monkeypatch.setattr(auth, "refresh", AsyncMock(side_effect=AuthError("expired")))
+    client = EdookitClient(SESSION, http=FakeClientSession([("GET", TIMETABLE_URL, _expired())]))
 
-    with pytest.raises(SessionExpired):
+    with pytest.raises(AuthError):
         await client.fetch_timetable_html()
+
+
+@pytest.mark.asyncio
+async def test_concurrent_calls_share_one_renewal(monkeypatch):
+    gate = asyncio.Event()
+
+    async def slow_refresh(session, *, http=None):
+        await gate.wait()
+        return _renewed("new")
+
+    refresh = AsyncMock(side_effect=slow_refresh)
+    monkeypatch.setattr(auth, "refresh", refresh)
+    fake = FakeClientSession(
+        [
+            ("GET", TIMETABLE_URL, _expired()),
+            ("GET", TIMETABLE_URL, _expired()),
+            ("GET", TIMETABLE_URL, ok(TIMETABLE_URL, body="a")),
+            ("GET", TIMETABLE_URL, ok(TIMETABLE_URL, body="b")),
+        ]
+    )
+    client = EdookitClient(SESSION, http=fake)
+
+    calls = asyncio.gather(client.fetch_timetable_html(), client.fetch_timetable_html())
+    for _ in range(5):  # let both calls hit the expiry and queue on the lock
+        await asyncio.sleep(0)
+    gate.set()
+
+    assert sorted(await calls) == ["a", "b"]
+    refresh.assert_awaited_once()
 
 
 @pytest.mark.asyncio

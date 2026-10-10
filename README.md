@@ -48,17 +48,21 @@ asyncio.run(main())
 ### Sessions
 
 The password is only used by `login()`. Store `session.to_json()` instead,
-and treat it like a password: it holds the Plus4U cookie, which signs in
-for about 19 days. Load it with `Session.from_json()`.
+and treat it like a password: it holds the Plus4U sign-in, which lasts about
+19 days (`session.plus4u_expires_at` tells you when). Load it with
+`Session.from_json()`; sessions stored by 0.3.x still load.
 
-The edookit session itself lasts 30-60 minutes. When it runs out, call
-`refresh(session)` to get a new one from the Plus4U cookie. When `refresh()`
-raises `AuthError`, the Plus4U cookie has expired too and you need `login()`
-again.
+`EdookitClient` renews the short-lived edookit session by itself and
+retries once. Pass `on_session_update` to persist each renewed session:
+
+    client = EdookitClient(session, on_session_update=lambda s: save(s.to_json()))
+
+When the Plus4U sign-in has expired too, calls raise `AuthError` and you
+need `login()` again.
 
 | Exception | Meaning | What to do |
 |---|---|---|
-| `SessionExpired` | the edookit session ran out | `refresh()` and retry |
+| `SessionExpired` | still expired right after a renewal | retry later |
 | `AuthError` | bad credentials, or the Plus4U cookie expired | `login()` |
 | `EdookitConnectionError` | network error or 30 s timeout | retry later |
 | `ParseError` | the portal's markup changed | the parser needs updating |
