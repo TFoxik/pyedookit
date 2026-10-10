@@ -8,3 +8,7 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    ignore:
+      # aiohttp caps multidict below 7; let aiohttp decide when that moves.
+      - dependency-name: multidict
+        update-types: ["version-update:semver-major"]
