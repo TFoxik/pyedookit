@@ -49,7 +49,8 @@ asyncio.run(main())
 
 The password is only used by `login()`. Store `session.to_json()` instead,
 and treat it like a password: it holds the Plus4U sign-in, which lasts about
-19 days (`session.plus4u_expires_at` tells you when). Load it with
+19 days (`session.plus4u_expires_at` tells you when, or is `None` if that's
+unknown or already past). Load it with
 `Session.from_json()`; sessions stored by 0.3.x still load.
 
 `EdookitClient` renews the short-lived edookit session by itself and

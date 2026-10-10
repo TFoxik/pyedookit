@@ -72,3 +72,5 @@ def test_loads_a_session_stored_by_pyedookit_0_3():
     assert session.cookies.get(EDOOKIT_HOST, "PHPSESSID") == "s"
     assert session.cookies.get(PLUS4U_HOST, "uoid.ps") == "p"
     assert session.csrf_token == "c"
+    assert "cookies" in json.loads(session.to_json())
+    assert Session.from_json(session.to_json()) == session

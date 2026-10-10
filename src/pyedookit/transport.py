@@ -131,7 +131,8 @@ def _parse_set_cookie(header: str, now: datetime) -> tuple[str, Cookie] | None:
         try:
             expires = now + timedelta(seconds=max_age)
         except OverflowError:
-            expires = datetime.max.replace(tzinfo=UTC) if max_age > 0 else now
+            # Not datetime.max: callers doing .astimezone() or + timedelta would overflow.
+            expires = now + timedelta(days=365 * 100) if max_age > 0 else now
     elif expires is not None and expires.tzinfo is None:
         expires = expires.replace(tzinfo=UTC)
     return name, Cookie(value.strip(), expires)

@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 from yarl import URL
@@ -100,6 +100,10 @@ def test_absurd_max_age_does_not_crash():
 
     assert store.get(HOST, "a") == "1"
     assert store.get(HOST, "b") is None
+    expires = store.expires(HOST, "a")
+    assert expires is not None
+    expires.astimezone(timezone(timedelta(hours=14)))
+    expires + timedelta(days=1)
     assert CookieStore.from_dict(store.to_dict()) == store
 
 

@@ -230,7 +230,14 @@ async def test_refresh_success_reuses_plus4u_cookies_without_password(monkeypatc
         monkeypatch,
         [
             _discovery_route(),
-            ("GET", AUTH_URL_PREFIX, redirect(f"{CALLBACK_URL}?code=fresh123")),
+            (
+                "GET",
+                AUTH_URL_PREFIX,
+                redirect(
+                    f"{CALLBACK_URL}?code=fresh123",
+                    set_cookies={"uoid.s": "s2", "uoid.bs": "b2"},
+                ),
+            ),
             ("GET", CALLBACK_URL, redirect(DASHBOARD_URL)),
             (
                 "GET",
@@ -254,6 +261,14 @@ async def test_refresh_success_reuses_plus4u_cookies_without_password(monkeypatc
 
     assert refreshed.cookies.get(EDOOKIT_HOST, "PHPSESSID") == "sess-new"
     assert refreshed.csrf_token == "csrf2"
+    assert refreshed.cookies.get(PLUS4U_HOST, "uoid.ps") == "p"
+    assert refreshed.cookies.get(PLUS4U_HOST, "uoid.s") == "s2"
+    assert refreshed.cookies.get(PLUS4U_HOST, "uoid.bs") == "b2"
+    assert stale.cookies.get(PLUS4U_HOST, "uoid.s") == "s"
+    assert stale.cookies.get(PLUS4U_HOST, "uoid.bs") == "b"
+    assert stale.cookies.get(PLUS4U_HOST, "uoid.ps") == "p"
+    assert stale.cookies.get(EDOOKIT_HOST, "PHPSESSID") == "old"
+    assert stale.cookies.get(EDOOKIT_HOST, "uu.app.csrf") == "old-csrf"
 
 
 @pytest.mark.asyncio
