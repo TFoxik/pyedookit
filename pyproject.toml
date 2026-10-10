@@ -9,7 +9,7 @@ description = "Async client for the Edookit parent portal (edookit.net)"
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
-authors = [{ name = "tomas.liska" }]
+authors = [{ name = "TFoxik" }]
 dependencies = [
     "aiohttp>=3.9",
     "beautifulsoup4>=4.12",
