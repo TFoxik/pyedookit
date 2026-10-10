@@ -116,17 +116,19 @@ class EdookitClient:
                 headers={"X-CSRF-Token": session.csrf_token, "X-Requested-With": "XMLHttpRequest"},
                 params=params,
             )
-        if response.is_redirect or _redirects_to_login(response.content_type, response.text):
+        if response.is_redirect or _is_ajax_redirect(response.content_type, response.text):
             raise SessionExpired("edookit session has expired")
         return response.text
 
 
-def _redirects_to_login(content_type: str, body: str) -> bool:
-    """Whether the portal answered with its AJAX-style login redirect.
+def _is_ajax_redirect(content_type: str, body: str) -> bool:
+    """Whether the portal answered with an AJAX-style redirect.
 
-    Requests carry X-Requested-With, so an expired session gets a 200 with
-    {"redirect": "https://<school>.edookit.net/user/login?message=1"} rather
-    than an HTTP redirect (confirmed against a real portal).
+    Requests carry X-Requested-With, so an expired session gets a 200 with a
+    JSON {"redirect": url} rather than an HTTP redirect. Both shapes seen on a
+    real portal are expired sessions: /user/login?message=1 and
+    /oidc/logout?performCallback=.... A redirect answer never carries the
+    page, so the target URL is deliberately not inspected.
     """
     if not content_type.startswith("application/json"):
         return False
@@ -134,5 +136,4 @@ def _redirects_to_login(content_type: str, body: str) -> bool:
         data = json.loads(body)
     except ValueError:
         return False
-    redirect = data.get("redirect") if isinstance(data, dict) else None
-    return isinstance(redirect, str) and auth.is_login_url(redirect)
+    return isinstance(data, dict) and isinstance(data.get("redirect"), str)

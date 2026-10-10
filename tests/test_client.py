@@ -125,12 +125,32 @@ async def test_concurrent_calls_share_one_renewal(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_get_returns_a_json_body_that_is_not_a_login_redirect():
-    response = ok(TIMETABLE_URL, body='{"redirect":"https://zs-example.edookit.net/timetable/"}')
-    response.headers["Content-Type"] = "application/json"
+async def test_oidc_logout_ajax_redirect_triggers_renewal(monkeypatch):
+    refresh = AsyncMock(return_value=_renewed("new"))
+    monkeypatch.setattr(auth, "refresh", refresh)
+    logout = ok(
+        TIMETABLE_URL,
+        body='{"redirect":"https://zs-example.edookit.net/oidc/logout?performCallback=1","state":[]}',
+        content_type="application/json; charset=utf-8",
+    )
+    fake = FakeClientSession(
+        [("GET", TIMETABLE_URL, logout), ("GET", TIMETABLE_URL, ok(TIMETABLE_URL, body="tt"))]
+    )
+    client = EdookitClient(SESSION, http=fake)
+
+    assert await client.fetch_timetable_html() == "tt"
+    refresh.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_get_returns_a_json_body_without_a_redirect_as_is(monkeypatch):
+    refresh = AsyncMock(return_value=_renewed("new"))
+    monkeypatch.setattr(auth, "refresh", refresh)
+    response = ok(TIMETABLE_URL, body='{"state":[]}', content_type="application/json")
     client = EdookitClient(SESSION, http=FakeClientSession([("GET", TIMETABLE_URL, response)]))
 
-    assert "timetable" in await client.fetch_timetable_html()
+    assert await client.fetch_timetable_html() == '{"state":[]}'
+    refresh.assert_not_awaited()
 
 
 @pytest.mark.asyncio
