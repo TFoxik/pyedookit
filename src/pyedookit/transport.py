@@ -115,7 +115,10 @@ def _parse_set_cookie(header: str, now: datetime) -> tuple[str, Cookie] | None:
                 continue
     if max_age is not None:
         # RFC 6265 5.3: Max-Age takes precedence over Expires.
-        expires = now + timedelta(seconds=max_age)
+        try:
+            expires = now + timedelta(seconds=max_age)
+        except OverflowError:
+            expires = datetime.max.replace(tzinfo=UTC) if max_age > 0 else now
     elif expires is not None and expires.tzinfo is None:
         expires = expires.replace(tzinfo=UTC)
     return name, Cookie(value.strip(), expires)

@@ -84,3 +84,12 @@ def test_for_host_is_an_independent_copy():
 
     assert copy.header(HOST) == ""
     assert store.get("uuidentity.plus4u.net", "uoid.ps") == "p"
+
+
+def test_absurd_max_age_does_not_crash():
+    store = CookieStore()
+    store.update(HOST, ["a=1; Max-Age=99999999999999", "b=2; Max-Age=-99999999999999"])
+
+    assert store.get(HOST, "a") == "1"
+    assert store.get(HOST, "b") is None
+    assert CookieStore.from_dict(store.to_dict()) == store
