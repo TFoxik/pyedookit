@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup, Tag
 
 from ..exceptions import ParseError
 from ..models import PORTAL_TZ, SchoolEvent
-from .dates import TIME_RE, find_days
+from .dates import TIME_RE, find_days, portal_today
 
 _EVENT_ID_RE = re.compile(r"event=(\d+)")
 
@@ -27,7 +27,7 @@ def parse_events(html: str, today: date | None = None) -> list[SchoolEvent]:
     if soup.select_one("section.content") is None:
         raise ParseError("upcoming events page has no content section")
     if today is None:
-        today = datetime.now(PORTAL_TZ).date()
+        today = portal_today()
 
     events: list[SchoolEvent] = []
     for row in soup.select("div.events_table ul.table_row"):
@@ -71,7 +71,7 @@ def _parse_row(row: Tag, today: date) -> SchoolEvent | None:
         start, end = days[0], days[-1]
 
     description = " ".join(
-        p.get_text(" ", strip=True) for p in row.select("li.c2 > p") if p.get_text(strip=True)
+        text for p in row.select("li.c2 > p") if (text := p.get_text(" ", strip=True))
     )
     creator = row.select_one("li.c3 div.smaller p b")
     return SchoolEvent(

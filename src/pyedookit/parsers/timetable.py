@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup, Tag
 
 from ..exceptions import ParseError
 from ..models import PORTAL_TZ, Lesson, Term
-from .dates import find_days
+from .dates import find_days, portal_today
 
 _TIME_RANGE_RE = re.compile(r"(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})")
 _TERM_ID_RE = re.compile(r"termSelector-new=(\d+)")
@@ -44,7 +44,7 @@ def parse_timetable(html: str, today: date | None = None) -> list[Lesson]:
         raise ParseError("no lesson-info blocks found on timetable page")
 
     if today is None:
-        today = datetime.now(PORTAL_TZ).date()
+        today = portal_today()
     lessons = []
     for block in blocks:
         lesson = _parse_lesson_info(block, today)

@@ -11,7 +11,7 @@ import aiohttp
 from yarl import URL
 
 from .exceptions import AuthError, EdookitConnectionError
-from .session import Session
+from .session import Session, school_base, validate_school
 
 _PLUS4U_OIDC_BASE = (
     "https://uuidentity.plus4u.net/uu-oidc-maing02/bb977a99f4cc4c37a2afce3fd599d0a7"
@@ -32,11 +32,9 @@ _CLIENT_ID_RE = re.compile(
 
 _PLUS4U_HOST = "uuidentity.plus4u.net"
 _MAX_REDIRECTS = 5
-
-# A school subdomain becomes part of a URL (redirect_uri, portal base) with
-# no other encoding, so reject anything that isn't a bare hostname label -
-# otherwise a value like "evil.com/" would redirect the OIDC flow off-portal.
-_SCHOOL_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,62}$")
+# Every hop of the login flow stays on these over https; anything else means
+# a response was tampered with, and must not receive cookies or the code.
+_ALLOWED_HOST_SUFFIXES = (".plus4u.net", ".edookit.net")
 
 REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
 
@@ -66,24 +64,24 @@ class _FetchResult:
     url: str
     text: str
     location: str | None
-    is_redirect: bool
 
-
-def _validate_school(school: str) -> None:
-    if not _SCHOOL_RE.match(school):
-        raise AuthError(f"{school!r} is not a valid Edookit school subdomain")
+    @property
+    def is_redirect(self) -> bool:
+        return self.status in REDIRECT_STATUSES
 
 
 def _school_host(school: str) -> str:
     return f"{school}.edookit.net"
 
 
-def _school_base(school: str) -> str:
-    return f"https://{_school_host(school)}"
-
-
 def _callback_url(school: str) -> str:
-    return f"{_school_base(school)}/user/oidc-login-callback"
+    return f"{school_base(school)}/user/oidc-login-callback"
+
+
+def _check_hop(url: URL) -> None:
+    host = url.host or ""
+    if url.scheme != "https" or not host.endswith(_ALLOWED_HOST_SUFFIXES):
+        raise AuthError(f"login flow tried to leave Plus4U/Edookit (to {url.scheme}://{host})")
 
 
 def _apply_set_cookies(headers: Iterable[str], jar: dict[str, str]) -> None:
@@ -140,7 +138,7 @@ async def _discover_client_id(
     - PHPSESSID etc. - joins the same cookie tracking the rest of the login
     flow uses, rather than being discarded.
     """
-    result = await _fetch(http, "GET", f"{_school_base(school)}/user/login", cookies_by_host)
+    result = await _fetch(http, "GET", f"{school_base(school)}/user/login", cookies_by_host)
     match = _CLIENT_ID_RE.search(result.text)
     if not match:
         raise AuthError(f"could not find a Plus4U client_id on {school}'s login page")
@@ -170,7 +168,9 @@ async def _fetch(
     current_params = params
 
     for _ in range(_MAX_REDIRECTS + 1):
-        host = URL(current_url).host or ""
+        parsed = URL(current_url)
+        _check_hop(parsed)
+        host = parsed.host or ""
         headers: dict[str, str] = {}
         host_cookies = cookies_by_host.get(host)
         if host_cookies:
@@ -189,20 +189,17 @@ async def _fetch(
                 if set_cookies := resp.headers.getall("Set-Cookie", []):
                     _apply_set_cookies(set_cookies, cookies_by_host.setdefault(host, {}))
 
-                is_redirect = resp.status in REDIRECT_STATUSES
                 location = resp.headers.get("Location")
-                text = "" if is_redirect else await resp.text()
                 result = _FetchResult(
                     status=resp.status,
                     url=str(resp.url),
-                    text=text,
+                    text="" if resp.status in REDIRECT_STATUSES else await resp.text(),
                     location=location,
-                    is_redirect=is_redirect,
                 )
         except (aiohttp.ClientError, TimeoutError) as err:
             raise EdookitConnectionError(f"request to {host} failed: {err}") from err
 
-        if not (follow_redirects and is_redirect and location):
+        if not (follow_redirects and result.is_redirect and location):
             return result
 
         current_url = str(URL(current_url).join(URL(location)))
@@ -221,7 +218,7 @@ def _new_http_session() -> aiohttp.ClientSession:
 
 
 @asynccontextmanager
-async def _http_session(http: aiohttp.ClientSession | None) -> AsyncIterator[aiohttp.ClientSession]:
+async def http_session(http: aiohttp.ClientSession | None) -> AsyncIterator[aiohttp.ClientSession]:
     if http is not None:
         yield http
         return
@@ -264,7 +261,7 @@ async def _finish_callback(
     result = await _fetch(http, "GET", callback_url, cookies_by_host, follow_redirects=True)
     if is_login_url(result.url):
         raise AuthError("edookit rejected the Plus4U authorization code")
-    settle = await _fetch(http, "GET", _school_base(school), cookies_by_host, follow_redirects=True)
+    settle = await _fetch(http, "GET", school_base(school), cookies_by_host, follow_redirects=True)
     if is_login_url(settle.url):
         raise AuthError("session did not settle after the OIDC callback")
     return _session_from_cookies(school, cookies_by_host)
@@ -276,10 +273,24 @@ async def probe_client_id(school: str) -> str:
     Used by scripts/capture_fixtures.py to show what login()/refresh() will
     use for this school before spending the user's password.
     """
-    _validate_school(school)
+    validate_school(school)
     cookies_by_host: CookiesByHost = {}
     async with _new_http_session() as http:
         return await _discover_client_id(http, school, cookies_by_host)
+
+
+async def _authorize(
+    http: aiohttp.ClientSession,
+    school: str,
+    cookies_by_host: CookiesByHost,
+    *,
+    prompt_none: bool = False,
+) -> tuple[str, str, _FetchResult]:
+    """Start the OIDC authorization: shared opening of login() and refresh()."""
+    client_id = await _discover_client_id(http, school, cookies_by_host)
+    state = secrets.token_urlsafe(16)
+    params = _auth_params(school, client_id, state, prompt_none=prompt_none)
+    return client_id, state, await _fetch(http, "GET", _AUTH_URL, cookies_by_host, params=params)
 
 
 async def login(
@@ -299,18 +310,10 @@ async def login(
     `aiohttp.DummyCookieJar()`): cookies are tracked per host by hand here,
     and a real jar would also collect and resend them.
     """
-    _validate_school(school)
+    validate_school(school)
     cookies_by_host: CookiesByHost = {}
-    async with _http_session(http) as http:
-        client_id = await _discover_client_id(http, school, cookies_by_host)
-        state = secrets.token_urlsafe(16)
-        step1 = await _fetch(
-            http,
-            "GET",
-            _AUTH_URL,
-            cookies_by_host,
-            params=_auth_params(school, client_id, state),
-        )
+    async with http_session(http) as http:
+        client_id, state, step1 = await _authorize(http, school, cookies_by_host)
         if not step1.is_redirect or not step1.location:
             raise AuthError(f"expected a redirect from Plus4U auth endpoint, got {step1.status}")
         login_url = URL(step1.location)
@@ -355,21 +358,12 @@ async def refresh(session: Session, *, http: aiohttp.ClientSession | None = None
     every 19 days), which means a full `login()` with the password is needed.
     `http` has the same cookie-jar requirement as in `login()`.
     """
-    _validate_school(session.school)
     # Only the Plus4U cookies: the portal answers /user/login with a redirect
     # to /oidc/logout when it sees the expired edookit session, so the new
     # edookit session is built from scratch, exactly like in login().
     cookies_by_host: CookiesByHost = {_PLUS4U_HOST: dict(session.plus4u_cookies)}
-    async with _http_session(http) as http:
-        client_id = await _discover_client_id(http, session.school, cookies_by_host)
-        state = secrets.token_urlsafe(16)
-        step1 = await _fetch(
-            http,
-            "GET",
-            _AUTH_URL,
-            cookies_by_host,
-            params=_auth_params(session.school, client_id, state, prompt_none=True),
-        )
+    async with http_session(http) as http:
+        _, _, step1 = await _authorize(http, session.school, cookies_by_host, prompt_none=True)
         if not step1.is_redirect or not step1.location or "code=" not in step1.location:
             raise AuthError("Plus4U session expired; full login required")
 

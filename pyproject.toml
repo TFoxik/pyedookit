@@ -4,16 +4,26 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pyedookit"
-version = "0.3.1"
+version = "0.3.2"
 description = "Async client for the Edookit parent portal (edookit.net)"
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
 authors = [{ name = "TFoxik" }]
+classifiers = [
+    "Framework :: AsyncIO",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Typing :: Typed",
+]
 dependencies = [
-    "aiohttp>=3.9",
+    "aiohttp>=3.14.3",
     "beautifulsoup4>=4.12",
-    "lxml>=5.0",
+    "lxml>=6.1.0",
+    "yarl>=1.24",
 ]
 
 [project.urls]
@@ -21,6 +31,9 @@ Homepage = "https://github.com/TFoxik/pyedookit"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pyedookit"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "README.md", "LICENSE"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -39,9 +52,9 @@ python_version = "3.12"
 
 [dependency-groups]
 dev = [
-    "pytest>=8.0",
-    "pytest-asyncio>=0.24",
-    "multidict>=6.0",
-    "ruff>=0.6",
-    "mypy>=1.11",
+    "pytest>=9.0",
+    "pytest-asyncio>=1.0",
+    "multidict>=6.9.1",
+    "ruff>=0.17",
+    "mypy>=2.4",
 ]

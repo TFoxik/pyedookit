@@ -1,8 +1,25 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
+
+from .exceptions import AuthError
+
+# A school subdomain becomes part of every portal URL with no other encoding,
+# so reject anything that isn't a bare hostname label - otherwise a value
+# like "evil.com/" or "evil.com#" would send the session's cookies off-portal.
+_SCHOOL_RE = re.compile(r"[a-z0-9][a-z0-9-]{0,62}")
+
+
+def validate_school(school: str) -> None:
+    if not _SCHOOL_RE.fullmatch(school):
+        raise AuthError(f"{school!r} is not a valid Edookit school subdomain")
+
+
+def school_base(school: str) -> str:
+    return f"https://{school}.edookit.net"
 
 
 @dataclass(slots=True)
@@ -16,16 +33,19 @@ class Session:
     """
 
     school: str
-    edookit_cookies: dict[str, str]
-    plus4u_cookies: dict[str, str]
-    csrf_token: str
+    edookit_cookies: dict[str, str] = field(repr=False)
+    plus4u_cookies: dict[str, str] = field(repr=False)
+    csrf_token: str = field(repr=False)
     edookit_expires_at: datetime = field(
         default_factory=lambda: datetime.now(UTC) + timedelta(minutes=30)
     )
 
+    def __post_init__(self) -> None:
+        validate_school(self.school)
+
     @property
     def base_url(self) -> str:
-        return f"https://{self.school}.edookit.net"
+        return school_base(self.school)
 
     @property
     def is_edookit_expired(self) -> bool:

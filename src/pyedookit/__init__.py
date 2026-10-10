@@ -7,7 +7,7 @@ from .exceptions import (
     ParseError,
     SessionExpired,
 )
-from .models import PORTAL_TZ, Lesson, PaymentRequest, Payments, SchoolEvent, Student, Term
+from .models import PORTAL_TZ, Lesson, PaymentRequest, Payments, SchoolEvent, Term
 from .parsers.fingerprint import content_fingerprint
 from .session import Session
 
@@ -25,7 +25,6 @@ __all__ = [
     "SchoolEvent",
     "Session",
     "SessionExpired",
-    "Student",
     "Term",
     "content_fingerprint",
     "login",

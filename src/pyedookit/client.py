@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 import aiohttp
 
 from . import auth
@@ -35,6 +37,9 @@ class EdookitClient:
     and closed per request. Cookies are sent by hand, so give it a
     `aiohttp.DummyCookieJar()` rather than a shared session whose jar would
     also collect the portal's cookies.
+
+    Pages are parsed in a worker thread so a large timetable doesn't stall
+    the caller's event loop.
     """
 
     def __init__(self, session: Session, http: aiohttp.ClientSession | None = None) -> None:
@@ -46,12 +51,11 @@ class EdookitClient:
         return self._session
 
     async def get_terms(self) -> list[Term]:
-        html = await self.fetch_timetable_html()
-        return parse_terms(html)
+        return await asyncio.to_thread(parse_terms, await self.fetch_timetable_html())
 
     async def get_timetable(self, week_offset: int = 0) -> list[Lesson]:
         html = await self.fetch_timetable_html(week_offset)
-        return parse_timetable(html)
+        return await asyncio.to_thread(parse_timetable, html)
 
     async def fetch_timetable_html(self, week_offset: int = 0) -> str:
         """Raw `/timetable/` HTML for one week - also used by
@@ -59,10 +63,10 @@ class EdookitClient:
         return await self._get(_TIMETABLE_PATH, params={"familyTimetable-value": week_offset})
 
     async def get_events(self) -> list[SchoolEvent]:
-        return parse_events(await self._get(_EVENTS_PATH))
+        return await asyncio.to_thread(parse_events, await self._get(_EVENTS_PATH))
 
     async def get_payments(self) -> Payments:
-        return parse_payments(await self._get(_PAYMENTS_PATH))
+        return await asyncio.to_thread(parse_payments, await self._get(_PAYMENTS_PATH))
 
     async def fetch_page(self, name: str) -> str:
         """Raw HTML of one of `CAPTURE_PAGES`, for pages without a parser yet."""
@@ -74,33 +78,23 @@ class EdookitClient:
 
     async def _get(self, path: str, params: dict[str, int] | None = None) -> str:
         url = f"{self._session.base_url}{path}"
-        headers = auth.build_headers(self._session)
-        if self._http is not None:
-            return await self._request(self._http, url, params, headers)
-        async with aiohttp.ClientSession() as http:
-            return await self._request(http, url, params, headers)
-
-    async def _request(
-        self,
-        http: aiohttp.ClientSession,
-        url: str,
-        params: dict[str, int] | None,
-        headers: dict[str, str],
-    ) -> str:
         # allow_redirects=False: our Cookie/CSRF headers are set manually, and
         # older aiohttp forwards a manually-set Cookie header to a redirect's
         # target even when that target is a different host - so an expired
         # session's redirect to Plus4U must never be followed with them
         # attached. Any redirect at all means the session isn't good anymore.
         try:
-            async with http.get(
-                url,
-                params=params,
-                headers=headers,
-                allow_redirects=False,
-                timeout=auth.REQUEST_TIMEOUT,
-            ) as resp:
-                if resp.status in auth.REDIRECT_STATUSES or auth.is_login_url(str(resp.url)):
+            async with (
+                auth.http_session(self._http) as http,
+                http.get(
+                    url,
+                    params=params,
+                    headers=auth.build_headers(self._session),
+                    allow_redirects=False,
+                    timeout=auth.REQUEST_TIMEOUT,
+                ) as resp,
+            ):
+                if resp.status in auth.REDIRECT_STATUSES:
                     raise SessionExpired("edookit session has expired")
                 return await resp.text()
         except (aiohttp.ClientError, TimeoutError) as err:

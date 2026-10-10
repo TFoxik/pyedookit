@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import re
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+
+from ..models import PORTAL_TZ
 
 # The portal writes the year only when it isn't the current one, and uses a
 # word instead of a date for recent days ("Dnes , 8:00 – 8:45"; Včera/Dnes
@@ -13,6 +15,10 @@ _DAY_RE = re.compile(
     re.IGNORECASE,
 )
 TIME_RE = re.compile(r"(\d{1,2}):(\d{2})")
+
+
+def portal_today() -> date:
+    return datetime.now(PORTAL_TZ).date()
 
 
 def find_days(text: str, today: date) -> list[date]:

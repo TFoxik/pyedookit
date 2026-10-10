@@ -30,12 +30,6 @@ class Term:
 
 
 @dataclass(frozen=True, slots=True)
-class Student:
-    id: str
-    name: str
-
-
-@dataclass(frozen=True, slots=True)
 class SchoolEvent:
     id: str
     title: str

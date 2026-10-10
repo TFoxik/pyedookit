@@ -6,14 +6,12 @@ pinning aiohttp to an old version just for tests - unacceptable for a
 library meant to run inside Home Assistant, which tracks recent aiohttp.
 This fake only implements the handful of members auth.py actually uses
 (`.request()` as an async context manager exposing `.status`, `.headers`,
-`.cookies`, `.url`, `.text()`), so it has nothing to break when aiohttp
-changes.
+`.url`, `.text()`), so it has nothing to break when aiohttp changes.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from http.cookies import SimpleCookie
 
 from multidict import CIMultiDict
 
@@ -22,7 +20,6 @@ from multidict import CIMultiDict
 class FakeResponse:
     status: int
     headers: CIMultiDict = field(default_factory=CIMultiDict)
-    cookies: SimpleCookie = field(default_factory=SimpleCookie)
     body: str = ""
     url: str = ""
 
@@ -44,17 +41,12 @@ def _response(
     raw_set_cookies: list[str] | None = None,
     **headers: str,
 ) -> FakeResponse:
-    """Builds `.cookies` from the Set-Cookie headers exactly as aiohttp does,
-    including SimpleCookie silently dropping cookies it can't parse."""
     all_headers: CIMultiDict[str] = CIMultiDict(headers)
     for key, value in (set_cookies or {}).items():
         all_headers.add("Set-Cookie", f"{key}={value}; Path=/")
     for raw in raw_set_cookies or []:
         all_headers.add("Set-Cookie", raw)
-    cookies: SimpleCookie = SimpleCookie()
-    for header in all_headers.getall("Set-Cookie", []):
-        cookies.load(header)
-    return FakeResponse(status=status, headers=all_headers, cookies=cookies, body=body, url=url)
+    return FakeResponse(status=status, headers=all_headers, body=body, url=url)
 
 
 def redirect(
