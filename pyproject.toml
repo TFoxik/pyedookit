@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/tfox/pyedookit"
+Homepage = "https://github.com/TFoxik/pyedookit"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pyedookit"]
