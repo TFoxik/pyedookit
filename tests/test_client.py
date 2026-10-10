@@ -36,6 +36,25 @@ async def test_get_raises_session_expired_on_any_redirect_without_following_it()
 
 
 @pytest.mark.asyncio
+async def test_get_raises_session_expired_on_the_ajax_login_redirect():
+    response = ok(TIMETABLE_URL, body=f'{{"redirect":"https://{SCHOOL}.edookit.net/user/login?message=1","state":[]}}')
+    response.headers["Content-Type"] = "application/json; charset=utf-8"
+    client = EdookitClient(SESSION, http=FakeClientSession([("GET", TIMETABLE_URL, response)]))
+
+    with pytest.raises(SessionExpired):
+        await client.fetch_timetable_html()
+
+
+@pytest.mark.asyncio
+async def test_get_returns_a_json_body_that_is_not_a_login_redirect():
+    response = ok(TIMETABLE_URL, body='{"redirect":"https://zs-example.edookit.net/timetable/"}')
+    response.headers["Content-Type"] = "application/json"
+    client = EdookitClient(SESSION, http=FakeClientSession([("GET", TIMETABLE_URL, response)]))
+
+    assert "timetable" in await client.fetch_timetable_html()
+
+
+@pytest.mark.asyncio
 async def test_get_returns_body_on_success():
     fake = FakeClientSession([("GET", TIMETABLE_URL, ok(TIMETABLE_URL, body="<html>tt</html>"))])
     client = EdookitClient(SESSION, http=fake)

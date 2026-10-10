@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 
 import aiohttp
 
@@ -96,6 +97,26 @@ class EdookitClient:
             ):
                 if resp.status in auth.REDIRECT_STATUSES:
                     raise SessionExpired("edookit session has expired")
-                return await resp.text()
+                body = await resp.text()
         except (aiohttp.ClientError, TimeoutError) as err:
             raise EdookitConnectionError(f"request to {url} failed: {err}") from err
+        if _redirects_to_login(resp.headers.get("Content-Type", ""), body):
+            raise SessionExpired("edookit session has expired")
+        return body
+
+
+def _redirects_to_login(content_type: str, body: str) -> bool:
+    """Whether the portal answered with its AJAX-style login redirect.
+
+    Requests carry X-Requested-With, so an expired session gets a 200 with
+    {"redirect": "https://<school>.edookit.net/user/login?message=1"} rather
+    than an HTTP redirect (confirmed against a real portal).
+    """
+    if not content_type.startswith("application/json"):
+        return False
+    try:
+        data = json.loads(body)
+    except ValueError:
+        return False
+    redirect = data.get("redirect") if isinstance(data, dict) else None
+    return isinstance(redirect, str) and auth.is_login_url(redirect)
