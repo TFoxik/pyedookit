@@ -5,8 +5,8 @@ import json
 
 import aiohttp
 
-from . import auth
-from .exceptions import EdookitConnectionError, SessionExpired
+from . import auth, transport
+from .exceptions import SessionExpired
 from .models import Lesson, Payments, SchoolEvent, Term
 from .parsers.events import parse_events
 from .parsers.payments import parse_payments
@@ -78,31 +78,19 @@ class EdookitClient:
         return await self._get(path)
 
     async def _get(self, path: str, params: dict[str, int] | None = None) -> str:
-        url = f"{self._session.base_url}{path}"
-        # allow_redirects=False: our Cookie/CSRF headers are set manually, and
-        # older aiohttp forwards a manually-set Cookie header to a redirect's
-        # target even when that target is a different host - so an expired
-        # session's redirect to Plus4U must never be followed with them
-        # attached. Any redirect at all means the session isn't good anymore.
-        try:
-            async with (
-                auth.http_session(self._http) as http,
-                http.get(
-                    url,
-                    params=params,
-                    headers=auth.build_headers(self._session),
-                    allow_redirects=False,
-                    timeout=auth.REQUEST_TIMEOUT,
-                ) as resp,
-            ):
-                if resp.status in auth.REDIRECT_STATUSES:
-                    raise SessionExpired("edookit session has expired")
-                body = await resp.text()
-        except (aiohttp.ClientError, TimeoutError) as err:
-            raise EdookitConnectionError(f"request to {url} failed: {err}") from err
-        if _redirects_to_login(resp.headers.get("Content-Type", ""), body):
+        session = self._session
+        async with transport.http_session(self._http) as http:
+            response = await transport.request(
+                http,
+                "GET",
+                f"{session.base_url}{path}",
+                session.cookies,
+                headers={"X-CSRF-Token": session.csrf_token, "X-Requested-With": "XMLHttpRequest"},
+                params=params,
+            )
+        if response.is_redirect or _redirects_to_login(response.content_type, response.text):
             raise SessionExpired("edookit session has expired")
-        return body
+        return response.text
 
 
 def _redirects_to_login(content_type: str, body: str) -> bool:

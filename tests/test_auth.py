@@ -1,13 +1,14 @@
 import aiohttp
 import pytest
 
-from pyedookit import auth
+from pyedookit import auth, transport
 from pyedookit.exceptions import AuthError, EdookitConnectionError
-from pyedookit.session import Session
+from pyedookit.session import PLUS4U_HOST, Session
 
 from .fakes import FailingResponse, FakeClientSession, ok, redirect, rejected
 
 SCHOOL = "zs-example"
+EDOOKIT_HOST = f"{SCHOOL}.edookit.net"
 LOGIN_URL = f"https://{SCHOOL}.edookit.net/user/login"
 AUTH_URL_PREFIX = (
     "https://uuidentity.plus4u.net/uu-oidc-maing02/bb977a99f4cc4c37a2afce3fd599d0a7/oidc/auth"
@@ -49,7 +50,7 @@ def _settle_route() -> tuple[str, str, object]:
 
 def _install_fake_session(monkeypatch: pytest.MonkeyPatch, routes) -> FakeClientSession:
     fake = FakeClientSession(routes)
-    monkeypatch.setattr(auth, "_new_http_session", lambda: fake)
+    monkeypatch.setattr(transport, "_new_http_session", lambda: fake)
     return fake
 
 
@@ -88,9 +89,11 @@ async def test_login_success_extracts_edookit_and_plus4u_cookies(monkeypatch):
     session = await auth.login(SCHOOL, "user@example.com", "hunter2")
 
     assert session.school == SCHOOL
-    assert session.edookit_cookies["PHPSESSID"] == "sess1"
+    assert session.cookies.get(EDOOKIT_HOST, "PHPSESSID") == "sess1"
     assert session.csrf_token == "csrf1"
-    assert session.plus4u_cookies == {"uoid.ps": "p", "uoid.s": "s", "uoid.bs": "b"}
+    assert session.cookies.get(PLUS4U_HOST, "uoid.ps") == "p"
+    assert session.cookies.get(PLUS4U_HOST, "uoid.s") == "s"
+    assert session.cookies.get(PLUS4U_HOST, "uoid.bs") == "b"
 
 
 @pytest.mark.asyncio
@@ -125,11 +128,9 @@ async def test_login_keeps_cookies_that_simplecookie_would_drop(monkeypatch):
 
     session = await auth.login(SCHOOL, "user@example.com", "hunter2")
 
-    assert session.plus4u_cookies == {
-        "uoid.ps": "persist1",
-        "uoid.s": '"quoted value"',
-        "uoid.bs": "b",
-    }
+    assert session.cookies.get(PLUS4U_HOST, "uoid.ps") == "persist1"
+    assert session.cookies.get(PLUS4U_HOST, "uoid.s") == '"quoted value"'
+    assert session.cookies.get(PLUS4U_HOST, "uoid.bs") == "b"
 
 
 @pytest.mark.asyncio
@@ -156,7 +157,8 @@ async def test_cookie_cleared_by_the_server_is_dropped(monkeypatch):
 
     session = await auth.login(SCHOOL, "user@example.com", "hunter2")
 
-    assert session.plus4u_cookies == {"uoid.ps": "p"}
+    assert session.cookies.get(PLUS4U_HOST, "uoid.ps") == "p"
+    assert session.cookies.get(PLUS4U_HOST, "uoid.old") is None
 
 
 @pytest.mark.asyncio
@@ -201,7 +203,7 @@ async def test_login_uses_an_injected_http_session_instead_of_opening_one(monkey
     def fail() -> None:
         raise AssertionError("login opened its own session despite http= being passed")
 
-    monkeypatch.setattr(auth, "_new_http_session", fail)
+    monkeypatch.setattr(transport, "_new_http_session", fail)
     injected = FakeClientSession([("GET", LOGIN_URL, ok(LOGIN_URL, body="<html></html>"))])
 
     with pytest.raises(AuthError):
@@ -219,11 +221,10 @@ async def test_probe_client_id_returns_the_discovered_value(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_refresh_success_reuses_plus4u_cookies_without_password(monkeypatch):
-    stale = Session(
-        school=SCHOOL,
-        edookit_cookies={"PHPSESSID": "old"},
-        plus4u_cookies={"uoid.ps": "p", "uoid.s": "s", "uoid.bs": "b"},
-        csrf_token="old-csrf",
+    stale = Session.from_cookies(
+        SCHOOL,
+        edookit={"PHPSESSID": "old", "uu.app.csrf": "old-csrf"},
+        plus4u={"uoid.ps": "p", "uoid.s": "s", "uoid.bs": "b"},
     )
     _install_fake_session(
         monkeypatch,
@@ -251,7 +252,7 @@ async def test_refresh_success_reuses_plus4u_cookies_without_password(monkeypatc
 
     refreshed = await auth.refresh(stale)
 
-    assert refreshed.edookit_cookies["PHPSESSID"] == "sess-new"
+    assert refreshed.cookies.get(EDOOKIT_HOST, "PHPSESSID") == "sess-new"
     assert refreshed.csrf_token == "csrf2"
 
 
@@ -265,11 +266,10 @@ async def test_refresh_does_not_send_the_stale_edookit_session_to_the_login_page
             return redirect(f"https://{SCHOOL}.edookit.net/oidc/logout?performCallback=1")
         return ok(LOGIN_URL, body=LOGIN_PAGE_HTML, set_cookies={"PHPSESSID": "fresh"})
 
-    stale = Session(
-        school=SCHOOL,
-        edookit_cookies={"PHPSESSID": "old", "uu.app.csrf": "old-csrf"},
-        plus4u_cookies={"uoid.ps": "p"},
-        csrf_token="old-csrf",
+    stale = Session.from_cookies(
+        SCHOOL,
+        edookit={"PHPSESSID": "old", "uu.app.csrf": "old-csrf"},
+        plus4u={"uoid.ps": "p"},
     )
     _install_fake_session(
         monkeypatch,
@@ -284,17 +284,17 @@ async def test_refresh_does_not_send_the_stale_edookit_session_to_the_login_page
 
     refreshed = await auth.refresh(stale)
 
-    assert refreshed.edookit_cookies == {"PHPSESSID": "fresh", "uu.app.csrf": "csrf2"}
+    assert refreshed.cookies.get(EDOOKIT_HOST, "PHPSESSID") == "fresh"
+    assert refreshed.cookies.get(EDOOKIT_HOST, "uu.app.csrf") == "csrf2"
     assert refreshed.csrf_token == "csrf2"
 
 
 @pytest.mark.asyncio
 async def test_refresh_raises_auth_error_when_plus4u_cookie_expired(monkeypatch):
-    stale = Session(
-        school=SCHOOL,
-        edookit_cookies={"PHPSESSID": "old"},
-        plus4u_cookies={"uoid.ps": "expired"},
-        csrf_token="old-csrf",
+    stale = Session.from_cookies(
+        SCHOOL,
+        edookit={"PHPSESSID": "old", "uu.app.csrf": "old-csrf"},
+        plus4u={"uoid.ps": "expired"},
     )
     _install_fake_session(
         monkeypatch,

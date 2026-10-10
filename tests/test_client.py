@@ -13,11 +13,8 @@ from .fakes import FailingResponse, FakeClientSession, ok, redirect
 SCHOOL = "zs-example"
 TIMETABLE_URL = f"https://{SCHOOL}.edookit.net/timetable/"
 
-SESSION = Session(
-    school=SCHOOL,
-    edookit_cookies={"PHPSESSID": "s", "uu.app.csrf": "csrf"},
-    plus4u_cookies={},
-    csrf_token="csrf",
+SESSION = Session.from_cookies(
+    SCHOOL, edookit={"PHPSESSID": "s", "uu.app.csrf": "csrf"}, plus4u={}
 )
 
 
@@ -25,7 +22,7 @@ SESSION = Session(
 async def test_get_raises_session_expired_on_any_redirect_without_following_it():
     # A redirect must never be followed here: our Cookie header is set
     # manually, and following it would forward the school's session cookie
-    # to whatever host the redirect points at (see client.py's _get).
+    # to whatever host the redirect points at (see transport.request).
     fake = FakeClientSession(
         [("GET", TIMETABLE_URL, redirect("https://uuidentity.plus4u.net/oidc/auth"))]
     )
@@ -123,3 +120,25 @@ async def test_fetch_page_only_allows_capture_pages():
     assert await client.fetch_page("assignments") == "<p>x</p>"
     with pytest.raises(ValueError):
         await client.fetch_page("settings")
+
+
+@pytest.mark.asyncio
+async def test_cookies_rotated_by_the_portal_are_kept_and_sent_next_time():
+    seen: list[dict] = []
+
+    def first(headers):
+        seen.append(headers)
+        return ok(TIMETABLE_URL, raw_set_cookies=["PHPSESSID=rotated; path=/"])
+
+    def second(headers):
+        seen.append(headers)
+        return ok(TIMETABLE_URL)
+
+    session = Session.from_cookies(SCHOOL, edookit={"PHPSESSID": "s"}, plus4u={})
+    fake = FakeClientSession([("GET", TIMETABLE_URL, first), ("GET", TIMETABLE_URL, second)])
+    client = EdookitClient(session, http=fake)
+
+    await client.fetch_timetable_html()
+    await client.fetch_timetable_html()
+
+    assert seen[1]["Cookie"] == "PHPSESSID=rotated"
