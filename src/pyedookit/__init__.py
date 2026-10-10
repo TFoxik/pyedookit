@@ -10,11 +10,13 @@ from .exceptions import (
 from .models import PORTAL_TZ, Lesson, PaymentRequest, Payments, SchoolEvent, Term
 from .parsers.fingerprint import content_fingerprint
 from .session import Session
+from .transport import CookieStore
 
 __all__ = [
     "CAPTURE_PAGES",
     "PORTAL_TZ",
     "AuthError",
+    "CookieStore",
     "EdookitClient",
     "EdookitConnectionError",
     "EdookitError",
