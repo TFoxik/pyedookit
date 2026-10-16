@@ -8,7 +8,7 @@ from collections.abc import Callable
 import aiohttp
 
 from . import auth, transport
-from .exceptions import SessionExpired
+from .exceptions import ParseError, SessionExpired
 from .models import Lesson, Payments, SchoolEvent, Term, TimetableWeek
 from .parsers.events import parse_events
 from .parsers.payments import parse_payments
@@ -30,7 +30,16 @@ CAPTURE_PAGES: dict[str, str] = {
 
 
 def _parse_week(html: str) -> TimetableWeek:
-    return TimetableWeek(parse_timetable(html), parse_periods(html))
+    periods = parse_periods(html)
+    try:
+        lessons = parse_timetable(html)
+    except ParseError:
+        # A holiday week renders the bell-schedule header but no lessons;
+        # a page with neither is not a timetable at all.
+        if not periods:
+            raise
+        lessons = []
+    return TimetableWeek(lessons, periods)
 
 
 class EdookitClient:
