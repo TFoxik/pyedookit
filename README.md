@@ -39,6 +39,7 @@ asyncio.run(main())
 | Call | Returns |
 |---|---|
 | `get_timetable()` | this week's `Lesson`s, times in `PORTAL_TZ` (Europe/Prague) |
+| `get_timetable_week(week_offset=0)` | a `TimetableWeek`: `lessons` plus the bell-schedule `periods`; offset `1` is next week |
 | `get_events()` | upcoming `SchoolEvent`s; all-day events have `date` start/end, end inclusive |
 | `get_payments()` | `Payments` totals and requests, amounts as `Decimal` |
 | `fetch_page(name)` | raw HTML of a page without a parser yet (`CAPTURE_PAGES`) |
