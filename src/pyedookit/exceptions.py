@@ -3,7 +3,7 @@ class EdookitError(Exception):
 
 
 class AuthError(EdookitError):
-    """Credentials were rejected, or the long-lived Plus4U session expired."""
+    """Credentials were rejected, or Plus4U answered that a new login is needed."""
 
 
 class SessionExpired(EdookitError):
@@ -19,4 +19,8 @@ class ParseError(EdookitError):
 
 
 class EdookitConnectionError(EdookitError):
-    """The portal or Plus4U could not be reached (network error or timeout)."""
+    """The portal or Plus4U could not be reached, or a session renewal failed.
+
+    Covers network errors, timeouts and renewals that fail for any reason
+    other than Plus4U asking for a new login; retrying later is the fix.
+    """

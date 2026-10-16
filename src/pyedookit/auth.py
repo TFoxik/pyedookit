@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json as _json
+import logging
 import re
 import secrets
 
@@ -8,9 +9,11 @@ import aiohttp
 from yarl import URL
 
 from . import transport
-from .exceptions import AuthError
+from .exceptions import AuthError, EdookitConnectionError
 from .session import PLUS4U_HOST, Session, school_base, school_host, validate_school
 from .transport import CookieStore, Response
+
+_LOGGER = logging.getLogger(__name__)
 
 _PLUS4U_OIDC_BASE = (
     "https://uuidentity.plus4u.net/uu-oidc-maing02/bb977a99f4cc4c37a2afce3fd599d0a7"
@@ -18,6 +21,13 @@ _PLUS4U_OIDC_BASE = (
 _AUTH_URL = f"{_PLUS4U_OIDC_BASE}/oidc/auth"
 _AUTH_PASSWORD_URL = f"{_PLUS4U_OIDC_BASE}/authPassword/authenticate"
 _REALM_CODE = "uuIdentityPasswordAuthNRealm"
+
+# OpenID Connect Core 3.1.2.6: the prompt=none answers meaning "the user has
+# to sign in again". Other errors (server_error, temporarily_unavailable...)
+# say nothing about the sign-in itself.
+_LOGIN_NEEDED_ERRORS = frozenset(
+    {"login_required", "interaction_required", "consent_required", "account_selection_required"}
+)
 
 # Confirmed against a real portal: the OIDC client_id is per-school, not a
 # single value shared across every Edookit install (third-party docs this
@@ -185,13 +195,26 @@ async def login(
         return await _finish_callback(http, step3.location, cookies, school)
 
 
+def _describe(response: Response) -> str:
+    """Status and redirect target for an error message, without code or state."""
+    if not response.location:
+        return f"HTTP {response.status}"
+    target = URL(response.location)
+    error = target.query.get("error")
+    return f"HTTP {response.status} to {target.host}{target.path}" + (
+        f" (error={error})" if error else ""
+    )
+
+
 async def refresh(session: Session, *, http: aiohttp.ClientSession | None = None) -> Session:
     """Obtain a fresh edookit session using the stored Plus4U cookies.
 
     No password is needed; this is what keeps a long-running Home Assistant
     integration logged in across the ~30-60 minute edookit session lifetime.
-    Raises AuthError if the Plus4U cookies have themselves expired (roughly
-    every 19 days), which means a full `login()` with the password is needed.
+    Raises AuthError only when Plus4U says a login is needed (its sign-in
+    expired or was revoked), which means a full `login()` with the password.
+    Any other failure - Plus4U or the portal erroring, a maintenance page -
+    raises EdookitConnectionError, so the caller retries later instead.
     `http` has the same cookie-jar requirement as in `login()`.
     """
     # Only the Plus4U cookies: the portal answers /user/login with a redirect
@@ -199,8 +222,29 @@ async def refresh(session: Session, *, http: aiohttp.ClientSession | None = None
     # edookit session is built from scratch, exactly like in login().
     cookies = session.cookies.for_host(PLUS4U_HOST)
     async with transport.http_session(http) as http:
-        _, _, step1 = await _authorize(http, session.school, cookies, prompt_none=True)
-        if not step1.is_redirect or not step1.location or "code=" not in step1.location:
-            raise AuthError("Plus4U session expired; full login required")
+        try:
+            _, _, step1 = await _authorize(http, session.school, cookies, prompt_none=True)
+        except AuthError as err:
+            raise EdookitConnectionError(f"could not start the Plus4U renewal: {err}") from err
 
-        return await _finish_callback(http, step1.location, cookies, session.school)
+        location = step1.location if step1.is_redirect else None
+        target = URL(location) if location else None
+        if target is not None and (
+            target.query.get("error") in _LOGIN_NEEDED_ERRORS or target.host == PLUS4U_HOST
+        ):
+            _LOGGER.warning("Plus4U sign-in needs a new login: %s", _describe(step1))
+            raise AuthError(f"Plus4U sign-in expired; full login required ({_describe(step1)})")
+        if (
+            location is None
+            or target is None
+            or "code" not in target.query
+            or "error" in target.query
+        ):
+            raise EdookitConnectionError(f"Plus4U renewal failed: {_describe(step1)}")
+
+        try:
+            return await _finish_callback(http, location, cookies, session.school)
+        except AuthError as err:
+            raise EdookitConnectionError(
+                f"edookit did not accept the renewed Plus4U sign-in: {err}"
+            ) from err

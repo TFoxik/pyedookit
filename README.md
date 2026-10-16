@@ -49,9 +49,9 @@ asyncio.run(main())
 ### Sessions
 
 The password is only used by `login()`. Store `session.to_json()` instead,
-and treat it like a password: it holds the Plus4U sign-in, which lasts about
-19 days (`session.plus4u_expires_at` tells you when, or is `None` if that's
-unknown or already past). Load it with
+and treat it like a password: it holds the Plus4U sign-in. Its cookie is set for 30
+days from `login()` (`session.plus4u_expires_at` tells you when, or is `None`
+if that's unknown or already past). Load it with
 `Session.from_json()`; sessions stored by 0.3.x still load.
 
 `EdookitClient` renews the short-lived edookit session by itself and
@@ -59,14 +59,16 @@ retries once. Pass `on_session_update` to persist each renewed session:
 
     client = EdookitClient(session, on_session_update=lambda s: save(s.to_json()))
 
-When the Plus4U sign-in has expired too, calls raise `AuthError` and you
-need `login()` again.
+Only when Plus4U answers that the user has to sign in again do calls raise
+`AuthError`, and you need `login()` again. A renewal that fails for any other
+reason (Plus4U or the portal erroring, a maintenance page) raises
+`EdookitConnectionError`, so a passing outage doesn't cost the user a login.
 
 | Exception | Meaning | What to do |
 |---|---|---|
 | `SessionExpired` | still expired right after a renewal | retry later |
-| `AuthError` | bad credentials, or the Plus4U cookie expired | `login()` |
-| `EdookitConnectionError` | network error or 30 s timeout | retry later |
+| `AuthError` | bad credentials, or Plus4U wants a new login | `login()` |
+| `EdookitConnectionError` | network error, 30 s timeout, or a failed renewal | retry later |
 | `ParseError` | the portal's markup changed | the parser needs updating |
 
 All of them derive from `EdookitError`. `login()`, `refresh()` and
