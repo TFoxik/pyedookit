@@ -7,10 +7,11 @@ from datetime import date, datetime, time
 from bs4 import BeautifulSoup, Tag
 
 from ..exceptions import ParseError
-from ..models import PORTAL_TZ, Lesson, Term
+from ..models import PORTAL_TZ, Lesson, Period, Term
 from .dates import find_days, portal_today
 
 _TIME_RANGE_RE = re.compile(r"(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})")
+_PERIOD_TITLE_RE = re.compile(r"^\s*(\d+)\s+(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})")
 _TERM_ID_RE = re.compile(r"termSelector-new=(\d+)")
 _NOTE_PREFIX = "Učivo:"
 
@@ -53,6 +54,25 @@ def parse_timetable(html: str, today: date | None = None) -> list[Lesson]:
         else:
             lessons.append(lesson)
     return lessons
+
+
+def parse_periods(html: str) -> list[Period]:
+    """Parse the bell schedule from the `period-time` header cells of the week grid.
+
+    Each cell carries a title like "1\xa008:00–08:45 " (number, non-breaking
+    space, time range). Returns an empty list when the page has no header.
+    """
+    soup = BeautifulSoup(html, "lxml")
+    periods: dict[int, Period] = {}
+    for cell in soup.select("div.period-time[title]"):
+        title = str(cell.get("title") or "").replace("\xa0", " ")
+        match = _PERIOD_TITLE_RE.match(title)
+        if not match:
+            _LOGGER.debug("skipping unparseable period title %r", title)
+            continue
+        number, sh, sm, eh, em = (int(g) for g in match.groups())
+        periods.setdefault(number, Period(number, time(sh, sm), time(eh, em)))
+    return [periods[number] for number in sorted(periods)]
 
 
 def parse_terms(html: str) -> list[Term]:
@@ -101,7 +121,7 @@ def _parse_lesson_info(block: Tag, today: date) -> Lesson | None:
         if note_text.startswith(_NOTE_PREFIX):
             note = note_text[len(_NOTE_PREFIX) :].strip() or None
 
-    _, _, group = code_group.partition(" - ")
+    code, _, group = code_group.partition(" - ")
 
     return Lesson(
         start=datetime.combine(lesson_date, time(sh, sm), tzinfo=PORTAL_TZ),
@@ -111,4 +131,5 @@ def _parse_lesson_info(block: Tag, today: date) -> Lesson | None:
         room=room or None,
         group=group or None,
         note=note,
+        code=code.strip() or None,
     )

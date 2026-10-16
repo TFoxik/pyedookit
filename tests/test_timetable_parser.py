@@ -4,8 +4,8 @@ from pathlib import Path
 import pytest
 
 from pyedookit.exceptions import ParseError
-from pyedookit.models import PORTAL_TZ
-from pyedookit.parsers.timetable import parse_terms, parse_timetable
+from pyedookit.models import PORTAL_TZ, Period
+from pyedookit.parsers.timetable import parse_periods, parse_terms, parse_timetable
 
 FIXTURE = (Path(__file__).parent / "fixtures" / "timetable_structure.html").read_text()
 
@@ -87,3 +87,36 @@ def test_warns_about_a_lesson_whose_date_cannot_be_read(caplog):
 
     assert [ls.subject for ls in lessons] == ["Dnešní"]
     assert "lesson-info-1" in caplog.text
+
+
+def test_lesson_keeps_the_subject_code_before_the_group():
+    assert parse_timetable(FIXTURE)[0].code == "Mat"
+
+
+def test_parses_the_bell_schedule_from_the_period_header():
+    assert parse_periods(FIXTURE) == [
+        Period(1, time(8, 0), time(8, 45)),
+        Period(2, time(8, 55), time(9, 40)),
+        Period(3, time(10, 0), time(10, 45)),
+    ]
+
+
+def test_no_period_header_gives_no_periods():
+    assert parse_periods("<html><body></body></html>") == []
+
+
+def test_code_without_a_group_is_the_whole_field():
+    html = """
+    <div class="lesson-info" id="lesson-info-1">
+        <div>
+            Po 14.&thinsp;9.&thinsp;2026,
+            <span class="date_time">8:00</span>&ndash;<span class="date_time">8:45</span>
+        </div>
+        <div>Čj</div>
+        <div>Český jazyk</div>
+        <div>Novák J.</div>
+        <div>1.A</div>
+    </div>
+    """
+    lessons = parse_timetable(html)
+    assert lessons[0].code == "Čj" and lessons[0].group is None
