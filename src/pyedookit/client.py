@@ -9,10 +9,10 @@ import aiohttp
 
 from . import auth, transport
 from .exceptions import SessionExpired
-from .models import Lesson, Payments, SchoolEvent, Term
+from .models import Lesson, Payments, SchoolEvent, Term, TimetableWeek
 from .parsers.events import parse_events
 from .parsers.payments import parse_payments
-from .parsers.timetable import parse_terms, parse_timetable
+from .parsers.timetable import parse_periods, parse_terms, parse_timetable
 from .session import Session
 
 _LOGGER = logging.getLogger(__name__)
@@ -27,6 +27,10 @@ CAPTURE_PAGES: dict[str, str] = {
     "inbox": "/overview/updates",
     "consents": "/consents/",
 }
+
+
+def _parse_week(html: str) -> TimetableWeek:
+    return TimetableWeek(parse_timetable(html), parse_periods(html))
 
 
 class EdookitClient:
@@ -69,6 +73,11 @@ class EdookitClient:
     async def get_timetable(self, week_offset: int = 0) -> list[Lesson]:
         html = await self.fetch_timetable_html(week_offset)
         return await asyncio.to_thread(parse_timetable, html)
+
+    async def get_timetable_week(self, week_offset: int = 0) -> TimetableWeek:
+        """Lessons and bell schedule of one week, parsed from a single fetch."""
+        html = await self.fetch_timetable_html(week_offset)
+        return await asyncio.to_thread(_parse_week, html)
 
     async def fetch_timetable_html(self, week_offset: int = 0) -> str:
         """Raw `/timetable/` HTML for one week - also used by

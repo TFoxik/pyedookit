@@ -7,7 +7,16 @@ from .exceptions import (
     ParseError,
     SessionExpired,
 )
-from .models import PORTAL_TZ, Lesson, PaymentRequest, Payments, SchoolEvent, Term
+from .models import (
+    PORTAL_TZ,
+    Lesson,
+    PaymentRequest,
+    Payments,
+    Period,
+    SchoolEvent,
+    Term,
+    TimetableWeek,
+)
 from .parsers.fingerprint import content_fingerprint
 from .session import Session
 from .transport import CookieStore
@@ -24,10 +33,12 @@ __all__ = [
     "ParseError",
     "PaymentRequest",
     "Payments",
+    "Period",
     "SchoolEvent",
     "Session",
     "SessionExpired",
     "Term",
+    "TimetableWeek",
     "content_fingerprint",
     "login",
     "refresh",

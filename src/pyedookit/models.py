@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, time
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
@@ -21,6 +21,20 @@ class Lesson:
     is_changed: bool = False
     is_cancelled: bool = False
     note: str | None = None
+    code: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class Period:
+    number: int
+    start: time
+    end: time
+
+
+@dataclass(slots=True)
+class TimetableWeek:
+    lessons: list[Lesson]
+    periods: list[Period]
 
 
 @dataclass(frozen=True, slots=True)

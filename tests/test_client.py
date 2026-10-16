@@ -244,3 +244,16 @@ async def test_cookies_rotated_by_the_portal_are_kept_and_sent_next_time():
     await client.fetch_timetable_html()
 
     assert seen[1]["Cookie"] == "PHPSESSID=rotated"
+
+
+@pytest.mark.asyncio
+async def test_get_timetable_week_parses_lessons_and_periods_from_one_fetch():
+    # FakeClientSession consumes each route once, so scripting a single
+    # /timetable/ route proves one fetch: a second request would fail.
+    html = (Path(__file__).parent / "fixtures" / "timetable_structure.html").read_text()
+    fake = FakeClientSession([("GET", TIMETABLE_URL, ok(TIMETABLE_URL, body=html))])
+
+    week = await EdookitClient(SESSION, http=fake).get_timetable_week()
+
+    assert [lesson.code for lesson in week.lessons] == ["Mat", "Tv"]
+    assert [period.number for period in week.periods] == [1, 2, 3]
