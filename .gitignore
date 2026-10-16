@@ -10,3 +10,8 @@ dist/
 cookies.json
 captures/
 .DS_Store
+.coverage
+htmlcov/
+.idea/
+.vscode/
+*.swp
