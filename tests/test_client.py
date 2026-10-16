@@ -8,7 +8,7 @@ import pytest
 
 from pyedookit import auth
 from pyedookit.client import EdookitClient
-from pyedookit.exceptions import AuthError, EdookitConnectionError, SessionExpired
+from pyedookit.exceptions import AuthError, EdookitConnectionError, ParseError, SessionExpired
 from pyedookit.session import Session
 
 from .fakes import FailingResponse, FakeClientSession, ok, redirect
@@ -257,3 +257,26 @@ async def test_get_timetable_week_parses_lessons_and_periods_from_one_fetch():
 
     assert [lesson.code for lesson in week.lessons] == ["Mat", "Tv"]
     assert [period.number for period in week.periods] == [1, 2, 3]
+
+
+@pytest.mark.asyncio
+async def test_get_timetable_week_of_a_holiday_week_has_periods_and_no_lessons():
+    html = (
+        '<html><body><div title="1&nbsp;08:00&ndash;08:45 " class="period-time"></div>'
+        '<div title="2&nbsp;08:55&ndash;09:40 " class="period-time"></div></body></html>'
+    )
+    fake = FakeClientSession([("GET", TIMETABLE_URL, ok(TIMETABLE_URL, body=html))])
+
+    week = await EdookitClient(SESSION, http=fake).get_timetable_week()
+
+    assert week.lessons == []
+    assert [period.number for period in week.periods] == [1, 2]
+
+
+@pytest.mark.asyncio
+async def test_get_timetable_week_still_raises_when_the_page_has_neither_lessons_nor_periods():
+    html = "<html><body>not a timetable</body></html>"
+    fake = FakeClientSession([("GET", TIMETABLE_URL, ok(TIMETABLE_URL, body=html))])
+
+    with pytest.raises(ParseError):
+        await EdookitClient(SESSION, http=fake).get_timetable_week()
