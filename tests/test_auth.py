@@ -323,6 +323,111 @@ async def test_refresh_raises_auth_error_when_plus4u_cookie_expired(monkeypatch)
         await auth.refresh(stale)
 
 
+def _stale_session() -> Session:
+    return Session.from_cookies(
+        SCHOOL, edookit={"PHPSESSID": "old"}, plus4u={"uoid.ps": "p", "uoid.s": "s"}
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("error", ["login_required", "interaction_required", "consent_required"])
+async def test_refresh_raises_auth_error_when_plus4u_answers_that_a_login_is_needed(
+    monkeypatch, error
+):
+    _install_fake_session(
+        monkeypatch,
+        [
+            _discovery_route(),
+            ("GET", AUTH_URL_PREFIX, redirect(f"{CALLBACK_URL}?error={error}&state=st")),
+        ],
+    )
+
+    with pytest.raises(AuthError, match=error):
+        await auth.refresh(_stale_session())
+
+
+# Seen on a real install: a single failed renewal was reported as an expired
+# Plus4U sign-in, yet the same cookies were still accepted hours later. Only
+# Plus4U saying "log in" may become AuthError (which makes Home Assistant ask
+# for the password); anything else is retried on the next poll.
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "routes",
+    [
+        pytest.param(
+            [_discovery_route(), ("GET", AUTH_URL_PREFIX, rejected(503))], id="plus4u-5xx"
+        ),
+        pytest.param(
+            [_discovery_route(), ("GET", AUTH_URL_PREFIX, rejected(429))], id="plus4u-429"
+        ),
+        pytest.param(
+            [
+                _discovery_route(),
+                (
+                    "GET",
+                    AUTH_URL_PREFIX,
+                    redirect(f"{CALLBACK_URL}?error=temporarily_unavailable&state=st"),
+                ),
+            ],
+            id="oidc-temporary-error",
+        ),
+        pytest.param(
+            [("GET", LOGIN_URL, ok(LOGIN_URL, body="<html>Údržba</html>"))],
+            id="portal-maintenance-page",
+        ),
+        pytest.param(
+            [
+                _discovery_route(),
+                ("GET", AUTH_URL_PREFIX, redirect(f"{CALLBACK_URL}?code=fresh123")),
+                ("GET", CALLBACK_URL, redirect(LOGIN_URL)),
+                ("GET", LOGIN_URL, ok(LOGIN_URL)),
+            ],
+            id="portal-rejects-code",
+        ),
+        pytest.param(
+            [
+                _discovery_route(),
+                ("GET", AUTH_URL_PREFIX, redirect(f"{CALLBACK_URL}?code=fresh123")),
+                ("GET", CALLBACK_URL, ok(CALLBACK_URL)),
+                ("GET", SCHOOL_BASE_URL, redirect(LOGIN_URL)),
+                ("GET", LOGIN_URL, ok(LOGIN_URL)),
+            ],
+            id="portal-session-does-not-settle",
+        ),
+    ],
+)
+async def test_refresh_failure_that_is_not_a_login_request_is_retryable(monkeypatch, routes):
+    _install_fake_session(monkeypatch, routes)
+
+    with pytest.raises(EdookitConnectionError) as excinfo:
+        await auth.refresh(_stale_session())
+
+    assert not isinstance(excinfo.value, AuthError)
+
+
+@pytest.mark.asyncio
+async def test_refresh_failure_message_names_the_cause_without_secrets(monkeypatch):
+    _install_fake_session(
+        monkeypatch,
+        [
+            _discovery_route(),
+            (
+                "GET",
+                AUTH_URL_PREFIX,
+                redirect(f"{CALLBACK_URL}?error=server_error&state=secret-state&code=secret-code"),
+            ),
+        ],
+    )
+
+    with pytest.raises(EdookitConnectionError) as excinfo:
+        await auth.refresh(_stale_session())
+
+    message = str(excinfo.value)
+    assert "302" in message
+    assert "server_error" in message
+    assert "secret" not in message
+
+
 @pytest.mark.asyncio
 async def test_login_rejects_malformed_school_without_making_a_request(monkeypatch):
     _install_fake_session(monkeypatch, [])  # any request would raise AssertionError
