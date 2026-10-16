@@ -2,7 +2,7 @@
 Synthetic fixture. The summary table, the per-person sums spans (Everyone,
 child 10001, parent 10002), the div.item.prescription... rows and
 div.status-icon > div.accepted for a paid request match a real /payments/
-capture from 2026-09-22. Titles, amounts, account numbers and symbols are
+capture. Titles, amounts, account numbers and symbols are
 placeholders.
 
 UNVERIFIED: the second request (no div.accepted) is hypothetical. No unpaid
@@ -19,14 +19,14 @@ request has been seen on a real portal yet.
     <tr>
       <th>Zaplaceno:</th>
       <td class="paid">
-        <span class="sums sumsEveryone" id="CZK_Everyone">1400 Kč<!-- --></span>
-        <span class="sums sums10001" id="CZK_10001" style="display:none;">1400 Kč<!-- --></span>
+        <span class="sums sumsEveryone" id="CZK_Everyone">1234 Kč<!-- --></span>
+        <span class="sums sums10001" id="CZK_10001" style="display:none;">1234 Kč<!-- --></span>
         <span class="sums sums10002" id="CZK_10002" style="display:none;">0 Kč<!-- --></span>
       </td>
       <th class="large-col">Zbývá zaplatit:</th>
       <td class="remaining">
-        <span class="sums sumsEveryone info" id="CZK_Everyone">400 Kč<!-- --></span>
-        <span class="sums sums10001 info" id="CZK_10001" style="display:none;">400 Kč<!-- --></span>
+        <span class="sums sumsEveryone info" id="CZK_Everyone">321 Kč<!-- --></span>
+        <span class="sums sums10001 info" id="CZK_10001" style="display:none;">321 Kč<!-- --></span>
         <span class="sums sums10002 info" id="CZK_10002" style="display:none;">0 Kč<!-- --></span>
       </td>
     </tr>
@@ -36,33 +36,33 @@ request has been seen on a real portal yet.
       <th class="overpayment-title overpayment-title10001">Přeplaceno:</th>
       <td class="overpayment overpayment10001" id="CZK_10001"><span>0 Kč</span></td>
       <th class="large-col">Celkem:</th>
-      <td><span class="sums sumsEveryone" id="CZK_Everyone">1800 Kč<!-- --></span></td>
+      <td><span class="sums sumsEveryone" id="CZK_Everyone">1555 Kč<!-- --></span></td>
     </tr>
   </table>
   <div class="grid-container payments" id="payments-grid">
     <div class="item prescription10001 prescriptionEveryone hasDetail">
       <div class="dots"><div class="dot" title="Žák A">Ž</div></div>
       <div class="column c1">
-        <div class="heading"><div class="text">Školní družina 09-12/26</div>
-          <div class="tag-container"><div class="tag">Poplatek za družinu</div></div></div>
-        <div class="description">Družina za 09-12/26</div>
+        <div class="heading"><div class="text">Testovací poplatek A</div>
+          <div class="tag-container"><div class="tag">Štítek A</div></div></div>
+        <div class="description">Popis poplatku A</div>
       </div>
-      <div class="column c4 mobile"><div class="amount">1400 Kč</div></div>
+      <div class="column c4 mobile"><div class="amount">1234 Kč</div></div>
       <div class="column c2"><div class="status-icon"><div class="accepted"></div></div><div class="status-text"></div></div>
       <div class="column c3"><table>
         <tr><th>Číslo účtu:</th><td>11111111/0100</td></tr>
         <tr><th>Variabilní symbol:</th><td>1234</td></tr>
         <tr><th>Specifický symbol:</th><td>55555</td></tr>
       </table></div>
-      <div class="column c4 desktop"><div class="amount">1400 Kč</div></div>
+      <div class="column c4 desktop"><div class="amount">1234 Kč</div></div>
     </div>
     <div class="item prescription10001 prescriptionEveryone hasDetail">
       <div class="column c1">
-        <div class="heading"><div class="text">Výlet do ZOO</div></div>
+        <div class="heading"><div class="text">Testovací poplatek B</div></div>
       </div>
-      <div class="column c4 mobile"><div class="amount">400 Kč</div></div>
+      <div class="column c4 mobile"><div class="amount">321 Kč</div></div>
       <div class="column c2"><div class="status-icon"></div><div class="status-text"></div></div>
-      <div class="column c4 desktop"><div class="amount">400 Kč</div></div>
+      <div class="column c4 desktop"><div class="amount">321 Kč</div></div>
     </div>
   </div>
 </div>

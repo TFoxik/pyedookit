@@ -209,7 +209,7 @@ async def test_get_payments_parses_the_payments_page():
 
     payments = await client.get_payments()
 
-    assert payments.remaining == Decimal(400)
+    assert payments.remaining == Decimal(321)
 
 
 @pytest.mark.asyncio

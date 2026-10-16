@@ -7,7 +7,7 @@ from pyedookit.exceptions import ParseError
 from pyedookit.models import PORTAL_TZ
 from pyedookit.parsers.timetable import parse_terms, parse_timetable
 
-FIXTURE = (Path(__file__).parent / "fixtures" / "timetable_real_structure.html").read_text()
+FIXTURE = (Path(__file__).parent / "fixtures" / "timetable_structure.html").read_text()
 
 
 def test_parses_each_lesson_info_block_with_its_own_date():

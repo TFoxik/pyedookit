@@ -13,8 +13,8 @@ FIXTURE = (Path(__file__).parent / "fixtures" / "payments_structure.html").read_
 def test_summary_uses_everyone_totals():
     payments = parse_payments(FIXTURE)
     assert (payments.paid, payments.remaining, payments.overpaid) == (
-        Decimal(1400),
-        Decimal(400),
+        Decimal(1234),
+        Decimal(321),
         Decimal(0),
     )
     assert payments.currency == "CZK"
@@ -22,8 +22,8 @@ def test_summary_uses_everyone_totals():
 
 def test_requests_and_paid_status():
     assert parse_payments(FIXTURE).requests == [
-        PaymentRequest("Školní družina 09-12/26", Decimal(1400), "CZK", is_paid=True),
-        PaymentRequest("Výlet do ZOO", Decimal(400), "CZK", is_paid=False),
+        PaymentRequest("Testovací poplatek A", Decimal(1234), "CZK", is_paid=True),
+        PaymentRequest("Testovací poplatek B", Decimal(321), "CZK", is_paid=False),
     ]
 
 

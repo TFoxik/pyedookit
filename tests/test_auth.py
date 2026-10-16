@@ -25,7 +25,7 @@ CONTINUE_URL = "https://uuidentity.plus4u.net/uu-oidc-maing02/continue"
 
 # The client_id is embedded per-school in this inline JS config block on the
 # real portal's own /user/login page - see auth._CLIENT_ID_RE.
-DISCOVERED_CLIENT_ID = "983960dcb7b84b34b9aecc5194381d56"
+DISCOVERED_CLIENT_ID = "0123456789abcdef0123456789abcdef"
 LOGIN_PAGE_HTML = f"""
 <script type="text/javascript">
     window.UU5 = {{

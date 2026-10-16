@@ -23,7 +23,7 @@ _REALM_CODE = "uuIdentityPasswordAuthNRealm"
 # single value shared across every Edookit install (third-party docs this
 # was originally inferred from implied otherwise). Each school's /user/login
 # page embeds it in a small inline JS config block, e.g.
-#   uu_app_oidc_providers_oidcg02_client_id: "983960dcb7b84b34b9aecc5194381d56"
+#   uu_app_oidc_providers_oidcg02_client_id: "0123456789abcdef0123456789abcdef"
 # so it has to be scraped fresh per school rather than hardcoded.
 _CLIENT_ID_RE = re.compile(
     r"uu_app_oidc_providers_oidcg02_client_id\s*:\s*['\"]([^'\"]+)['\"]"
