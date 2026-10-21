@@ -9,8 +9,10 @@ import aiohttp
 
 from . import auth, transport
 from .exceptions import ParseError, SessionExpired
-from .models import Lesson, Payments, SchoolEvent, Term, TimetableWeek
+from .models import Lesson, Message, MessageSummary, Payments, SchoolEvent, Term, TimetableWeek
 from .parsers.events import parse_events
+from .parsers.inbox import parse_inbox
+from .parsers.message import parse_message
 from .parsers.payments import parse_payments
 from .parsers.timetable import parse_periods, parse_terms, parse_timetable
 from .session import Session
@@ -20,11 +22,12 @@ _LOGGER = logging.getLogger(__name__)
 _TIMETABLE_PATH = "/timetable/"
 _EVENTS_PATH = "/timetable/upcoming"
 _PAYMENTS_PATH = "/payments/"
+_INBOX_PATH = "/overview/updates"
+_MESSAGE_PATH = "/messages/detail"
 
 CAPTURE_PAGES: dict[str, str] = {
     "assignments": "/assignments/",
     "exams": "/exams/",
-    "inbox": "/overview/updates",
     "consents": "/consents/",
 }
 
@@ -99,6 +102,14 @@ class EdookitClient:
     async def get_payments(self) -> Payments:
         return await asyncio.to_thread(parse_payments, await self._get(_PAYMENTS_PATH))
 
+    async def get_inbox(self) -> list[MessageSummary]:
+        return await asyncio.to_thread(parse_inbox, await self._get(_INBOX_PATH, ajax=False))
+
+    async def get_message(self, message_id: int) -> Message:
+        """One message in full; fetching it is expected to mark it read on the portal."""
+        html = await self._get(_MESSAGE_PATH, params={"message": message_id}, ajax=False)
+        return await asyncio.to_thread(parse_message, html, message_id, self._session.base_url)
+
     async def fetch_page(self, name: str) -> str:
         """Raw HTML of one of `CAPTURE_PAGES`, for pages without a parser yet."""
         try:
@@ -107,14 +118,22 @@ class EdookitClient:
             raise ValueError(f"{name!r} is not one of {sorted(CAPTURE_PAGES)}") from None
         return await self._get(path)
 
-    async def _get(self, path: str, params: dict[str, int] | None = None) -> str:
+    async def _get(
+        self, path: str, params: dict[str, int] | None = None, *, ajax: bool = True
+    ) -> str:
+        """GET a portal page, renewing the session once if it has expired.
+
+        `ajax=False` requests the page as a browser's first load does: for
+        an AJAX request the portal renders the inbox's first-run guide with
+        sample items instead of the real ones.
+        """
         session = self._session
         try:
-            return await self._fetch(session, path, params)
+            return await self._fetch(session, path, params, ajax)
         except SessionExpired:
             _LOGGER.debug("Edookit session expired, renewing it")
             await self._renew(session)
-        return await self._fetch(self._session, path, params)
+        return await self._fetch(self._session, path, params, ajax)
 
     async def _renew(self, stale: Session) -> None:
         async with self._renew_lock:
@@ -124,19 +143,40 @@ class EdookitClient:
             if self._on_session_update is not None:
                 self._on_session_update(self._session)
 
-    async def _fetch(self, session: Session, path: str, params: dict[str, int] | None) -> str:
+    async def _fetch(
+        self, session: Session, path: str, params: dict[str, int] | None, ajax: bool
+    ) -> str:
+        headers = (
+            {"X-CSRF-Token": session.csrf_token, "X-Requested-With": "XMLHttpRequest"}
+            if ajax
+            else None
+        )
         async with transport.http_session(self._http) as http:
             response = await transport.request(
                 http,
                 "GET",
                 f"{session.base_url}{path}",
                 session.cookies,
-                headers={"X-CSRF-Token": session.csrf_token, "X-Requested-With": "XMLHttpRequest"},
+                headers=headers,
                 params=params,
             )
-        if response.is_redirect or _is_ajax_redirect(response.content_type, response.text):
+        if (
+            response.is_redirect
+            or _is_ajax_redirect(response.content_type, response.text)
+            or (not ajax and _is_login_page(response.text))
+        ):
             raise SessionExpired("edookit session has expired")
         return response.text
+
+
+def _is_login_page(body: str) -> bool:
+    """Whether a plain GET was answered with the sign-in page.
+
+    An expired session has only been seen as an AJAX redirect; a plain GET is
+    expected to get an HTTP redirect, but a 200 sign-in page is caught here
+    too. Every signed-in portal page carries the logout link.
+    """
+    return "/user/login" in body and "/user/logout" not in body
 
 
 def _is_ajax_redirect(content_type: str, body: str) -> bool:
