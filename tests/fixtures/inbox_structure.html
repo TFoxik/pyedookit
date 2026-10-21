@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head><title>Přijaté – Školní portál</title></head>
+<body>
+<a href="/user/logout">Odhlásit se</a>
+<div class="grid-container inbox" id="inbox-grid">
+  <div class="item message inboxMessage shownType shownPeople unread clickable inbox-help overlay-content initial">
+    <div class="dots"><div class="dot" title="Já"></div></div>
+    <div class="column c1"><div class="type"><div class="icon message"></div></div></div>
+    <div class="column c2">
+      <div class="object-name">Vzorová zpráva</div>
+      <div class="object-type">Zpráva</div>
+      <div class="description">Toto je vzorová zpráva.</div>
+    </div>
+    <div class="column c3">
+      <div class="creator">Jan Novák</div>
+      <div class="time"><span class="date-yesterday" title="20. 10. 2026">Včera</span></div>
+    </div>
+  </div>
+  <div class="item archive-notification inbox-help overlay-content message inboxMessage shownType shownPeople" style="display: none; position:absolute; z-index:30000;">
+    Položka byla archivována.<br/>
+    <a class="ajax" onclick="undoArchiveAnimation(this.parentNode)">Vrátit zpět</a>
+  </div>
+  <div class="item message inboxMessage shownType shownPeople forEveryone forMe for11704 unread clickable">
+    <div class="dots"><div class="dot" title="Já">R</div></div>
+    <div class="right-icons-container">
+      <a class="reply icon-link" title="Odpovědět" href="/messages/reply?kind=datatemplate.message&amp;oid=9003&amp;noFollowers=1"></a>
+      <a class="ajax archive icon-link" title="Archivovat" href="/overview/updates?updates-objectId=9003&amp;updates-objectTable=datatemplate.message&amp;do=updates-archiv"></a>
+      <a class="ajax star icon-link" title="Připnout na hlavní panel" href="/overview/updates?updates-objectId=9003&amp;updates-objectTable=datatemplate.message&amp;do=updates-star"></a>
+    </div>
+    <div class="column c1"><div class="type"><div class="icon message"></div></div></div>
+    <div class="column c2">
+      <div class="object-name"><a class="simply-highlighted" href="/messages/detail?message=9003">Třídní schůzky</a></div>
+      <div class="object-type">Zpráva</div>
+      <div class="description">Vážení rodiče,
+        zveme vás…</div>
+    </div>
+    <div class="column c3">
+      <div class="creator">Učitelka A</div>
+      <div class="mobile comma">,</div>
+      <div class="time">21. 10. 2026, <span class="date_time">8:12</span></div>
+    </div>
+  </div>
+  <div class="item event shownType shownPeople forEveryone forStudents for11579 clickable" onclick='window.location.href="/timetable/detail?event=1"'>
+    <div class="column c1"><div class="type"><div class="icon event"></div></div></div>
+    <div class="column c2">
+      <div class="object-name">Výlet</div>
+      <div class="object-type">Událost</div>
+      <div class="description">Celodenní výlet.</div>
+    </div>
+    <div class="column c3">
+      <div class="creator">Učitelka A</div>
+      <div class="time">20. 10. 2026, <span class="date_time">9:00</span></div>
+    </div>
+  </div>
+  <div class="item message inboxMessage shownType shownPeople forEveryone forMe for11704 clickable">
+    <div class="dots"><div class="dot" title="Já">R</div></div>
+    <div class="column c1"><div class="type"><div class="icon message"></div></div></div>
+    <div class="column c2">
+      <div class="object-name"><a class="simply-highlighted" href="/messages/detail?message=9002">Kroužky</a></div>
+      <div class="object-type">Zpráva</div>
+      <div class="description">Přihlášky do kroužků…</div>
+    </div>
+    <div class="column c3">
+      <div class="creator">Učitel B</div>
+      <div class="mobile comma">,</div>
+      <div class="time"><span class="date-yesterday" title="20. 10. 2026">Včera</span>, <span class="date_time">17:05</span></div>
+    </div>
+  </div>
+  <div class="item evaluation evaluationBox shownType shownPeople forEveryone forStudents for11579 clickable" onclick='window.location.href="/evaluation/detail?evaluationId=1"'>
+    <div class="column c2"><div class="object-name">Matematika</div></div>
+    <div class="column c3"><div class="time">19. 10. 2026, <span class="date_time">10:00</span></div></div>
+  </div>
+  <div class="item message inboxMessage shownType shownPeople forEveryone forMe for11704 clickable">
+    <div class="dots"><div class="dot" title="Já">R</div></div>
+    <div class="column c1"><div class="type"><div class="icon message"></div></div></div>
+    <div class="column c2">
+      <div class="object-name"><a class="simply-highlighted" href="/messages/detail?message=9001">Omluvenky</a></div>
+      <div class="object-type">Zpráva</div>
+      <div class="description">Omluvenky posílejte přes portál.</div>
+    </div>
+    <div class="column c3">
+      <div class="creator">Ředitelství</div>
+      <div class="mobile comma">,</div>
+      <div class="time"><span class="date_time">7:30</span></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
