@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime, time
 from decimal import Decimal
+from typing import Any
 from zoneinfo import ZoneInfo
 
 # The portal renders wall-clock times with no zone; every Edookit school is
@@ -55,6 +56,33 @@ class SchoolEvent:
     @property
     def all_day(self) -> bool:
         return not isinstance(self.start, datetime)
+
+
+@dataclass(frozen=True, slots=True)
+class MessageSummary:
+    id: int
+    subject: str
+    sender: str
+    sent: datetime
+    preview: str
+    unread: bool
+
+
+# A sanitised message body, ready to serialise as JSON: `{"text": str}`, or
+# `{"tag": str, "children": [...]}` with tag one of p, br, strong, em, u, ul,
+# ol, li, a; an `a` also has `"href"`, always http(s).
+type BodyNode = dict[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
+class Message:
+    id: int
+    subject: str
+    sender: str
+    recipients: str
+    sent: datetime
+    body: list[BodyNode]
+    body_text: str
 
 
 @dataclass(frozen=True, slots=True)
