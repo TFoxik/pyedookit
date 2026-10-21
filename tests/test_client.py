@@ -280,3 +280,123 @@ async def test_get_timetable_week_still_raises_when_the_page_has_neither_lessons
 
     with pytest.raises(ParseError):
         await EdookitClient(SESSION, http=fake).get_timetable_week()
+
+
+INBOX_URL = f"https://{SCHOOL}.edookit.net/overview/updates"
+MESSAGE_URL = f"https://{SCHOOL}.edookit.net/messages/detail"
+INBOX = (FIXTURES / "inbox_structure.html").read_text()
+MESSAGE = (FIXTURES / "message_structure.html").read_text()
+LOGIN_PAGE = '<html><form action="/user/login" method="post"></form></html>'
+
+
+def _recording(seen: list[dict], body: str, url: str = INBOX_URL):
+    def answer(headers):
+        seen.append(headers)
+        return ok(url, body=body)
+
+    return answer
+
+
+@pytest.mark.asyncio
+async def test_get_inbox_parses_the_inbox_page():
+    client = EdookitClient(
+        SESSION, http=FakeClientSession([("GET", INBOX_URL, ok(INBOX_URL, body=INBOX))])
+    )
+
+    messages = await client.get_inbox()
+
+    assert [m.id for m in messages] == [9003, 9002, 9001]
+
+
+@pytest.mark.asyncio
+async def test_inbox_and_message_are_fetched_without_the_ajax_headers():
+    seen: list[dict] = []
+    fake = FakeClientSession(
+        [
+            ("GET", INBOX_URL, _recording(seen, INBOX)),
+            ("GET", MESSAGE_URL, _recording(seen, MESSAGE, MESSAGE_URL)),
+        ]
+    )
+    client = EdookitClient(SESSION, http=fake)
+
+    await client.get_inbox()
+    await client.get_message(9003)
+
+    for headers in seen:
+        assert "X-Requested-With" not in headers
+        assert "X-CSRF-Token" not in headers
+        assert "PHPSESSID=s" in headers["Cookie"]
+
+
+@pytest.mark.asyncio
+async def test_timetable_is_still_fetched_with_the_ajax_headers():
+    seen: list[dict] = []
+    fake = FakeClientSession([("GET", TIMETABLE_URL, _recording(seen, "tt", TIMETABLE_URL))])
+
+    await EdookitClient(SESSION, http=fake).fetch_timetable_html()
+
+    assert seen[0]["X-Requested-With"] == "XMLHttpRequest"
+
+
+@pytest.mark.asyncio
+async def test_get_message_fetches_the_detail_page():
+    fake = FakeClientSession([("GET", MESSAGE_URL, ok(MESSAGE_URL, body=MESSAGE))])
+
+    message = await EdookitClient(SESSION, http=fake).get_message(9003)
+
+    assert (message.id, message.subject) == (9003, "Třídní schůzky")
+
+
+@pytest.mark.asyncio
+async def test_plain_fetch_redirect_counts_as_expired_and_is_renewed(monkeypatch):
+    refresh = AsyncMock(return_value=_renewed("new"))
+    monkeypatch.setattr(auth, "refresh", refresh)
+    fake = FakeClientSession(
+        [
+            ("GET", INBOX_URL, redirect(f"https://{SCHOOL}.edookit.net/user/login")),
+            ("GET", INBOX_URL, ok(INBOX_URL, body=INBOX)),
+        ]
+    )
+
+    messages = await EdookitClient(SESSION, http=fake).get_inbox()
+
+    assert [m.id for m in messages] == [9003, 9002, 9001]
+    refresh.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_plain_fetch_login_page_counts_as_expired(monkeypatch):
+    refresh = AsyncMock(return_value=_renewed("new"))
+    monkeypatch.setattr(auth, "refresh", refresh)
+    fake = FakeClientSession(
+        [
+            ("GET", INBOX_URL, ok(INBOX_URL, body=LOGIN_PAGE)),
+            ("GET", INBOX_URL, ok(INBOX_URL, body=INBOX)),
+        ]
+    )
+
+    messages = await EdookitClient(SESSION, http=fake).get_inbox()
+
+    assert [m.id for m in messages] == [9003, 9002, 9001]
+    refresh.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_logged_in_page_mentioning_login_is_not_expired(monkeypatch):
+    refresh = AsyncMock()
+    monkeypatch.setattr(auth, "refresh", refresh)
+    body = INBOX.replace("</body>", '<a href="/user/login?switch=1">x</a></body>')
+    fake = FakeClientSession([("GET", INBOX_URL, ok(INBOX_URL, body=body))])
+
+    messages = await EdookitClient(SESSION, http=fake).get_inbox()
+
+    assert len(messages) == 3
+    refresh.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_inbox_is_no_longer_a_capture_page():
+    client = EdookitClient(SESSION, http=FakeClientSession([]))
+
+    with pytest.raises(ValueError):
+        await client.fetch_page("inbox")

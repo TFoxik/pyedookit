@@ -42,7 +42,16 @@ asyncio.run(main())
 | `get_timetable_week(week_offset=0)` | a `TimetableWeek`: `lessons` plus the bell-schedule `periods`; offset `1` is next week |
 | `get_events()` | upcoming `SchoolEvent`s; all-day events have `date` start/end, end inclusive |
 | `get_payments()` | `Payments` totals and requests, amounts as `Decimal` |
+| `get_inbox()` | the `MessageSummary`s in Schránka, newest first: subject, sender, sent time, preview, `unread` |
+| `get_message(id)` | one `Message` in full; opening it on the portal marks it read, so expect this to as well (not yet observed) |
 | `fetch_page(name)` | raw HTML of a page without a parser yet (`CAPTURE_PAGES`) |
+
+The inbox and message pages are requested the way a browser's first page
+load is, without the AJAX headers the other calls send: to an AJAX request
+the portal answers with the inbox's first-run guide and its sample items.
+`Message.body` is the message's HTML reduced to a JSON-ready node tree of
+p, br, strong, em, u, ul, ol, li and http(s) links; everything else, scripts
+and event handlers included, is dropped. Render it as nodes, never as HTML.
 
 `content_fingerprint(html)` tells you when such a page's content changed.
 
