@@ -43,7 +43,7 @@ asyncio.run(main())
 | `get_events()` | upcoming `SchoolEvent`s; all-day events have `date` start/end, end inclusive |
 | `get_payments()` | `Payments` totals and requests, amounts as `Decimal` |
 | `get_inbox()` | the `MessageSummary`s in Schránka, newest first: subject, sender, sent time, preview, `unread` |
-| `get_message(id)` | one `Message` in full; opening it on the portal marks it read, so expect this to as well (not yet observed) |
+| `get_message(id)` | one `Message` in full; fetching it marks the message read on the portal |
 | `fetch_page(name)` | raw HTML of a page without a parser yet (`CAPTURE_PAGES`) |
 
 The inbox and message pages are requested the way a browser's first page

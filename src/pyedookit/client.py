@@ -106,7 +106,7 @@ class EdookitClient:
         return await asyncio.to_thread(parse_inbox, await self._get(_INBOX_PATH, ajax=False))
 
     async def get_message(self, message_id: int) -> Message:
-        """One message in full; fetching it is expected to mark it read on the portal."""
+        """One message in full; fetching it marks the message read on the portal."""
         html = await self._get(_MESSAGE_PATH, params={"message": message_id}, ajax=False)
         return await asyncio.to_thread(parse_message, html, message_id, self._session.base_url)
 

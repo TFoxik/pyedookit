@@ -15,9 +15,8 @@ don't end up in shell history), logs in, and saves:
   captures/inbox.html
   captures/message_<id>.html  (every message in the inbox; only with --messages)
 
-Fetching a message page is expected to mark that message read on the portal,
-so --messages reads every unread message: leave it off while waiting for an
-unread one.
+Fetching a message page marks that message read on the portal, so --messages
+marks every unread message read.
 
 `captures/` is gitignored. These files come from an authenticated session
 and can contain more than student/teacher names - a CSRF token, session
