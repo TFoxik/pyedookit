@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pyedookit"
-version = "0.5.1"
+version = "0.6.0"
 description = "Async client for the Edookit parent portal (edookit.net)"
 readme = "README.md"
 requires-python = ">=3.12"
