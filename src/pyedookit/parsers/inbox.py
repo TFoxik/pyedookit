@@ -24,7 +24,8 @@ def parse_inbox(html: str, today: date | None = None) -> list[MessageSummary]:
 
     Confirmed against a real capture: the feed mixes messages, events,
     evaluations and guidance items in `#inbox-grid`; only `div.item.message`
-    is read. The `unread` class has been seen only on the guide's samples.
+    is read; an unread one carries the `unread` class (confirmed on a real
+    message, 2026-10-23).
     """
     soup = BeautifulSoup(html, "lxml")
     grid = soup.select_one("#inbox-grid")
