@@ -9,6 +9,7 @@ from bs4 import BeautifulSoup, Tag
 from ..exceptions import ParseError
 from ..models import PORTAL_TZ, MessageSummary
 from .dates import TIME_RE, find_days, portal_today
+from .text import tag_text as _text
 
 _MESSAGE_LINK_RE = re.compile(r"^/messages/detail\?message=(\d+)$")
 # `initial` items are the first-run guide's samples ("Vzorová zpráva"), which
@@ -48,10 +49,6 @@ def parse_inbox(html: str, today: date | None = None) -> list[MessageSummary]:
         else:
             messages.append(message)
     return messages
-
-
-def _text(tag: Tag | None) -> str:
-    return " ".join(tag.get_text(" ", strip=True).split()) if tag else ""
 
 
 def _message_id(item: Tag) -> int | None:

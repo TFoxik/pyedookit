@@ -10,6 +10,8 @@ from .exceptions import (
 from .models import (
     PORTAL_TZ,
     BodyNode,
+    Grade,
+    Grades,
     Lesson,
     Message,
     MessageSummary,
@@ -17,6 +19,7 @@ from .models import (
     Payments,
     Period,
     SchoolEvent,
+    Subject,
     Term,
     TimetableWeek,
 )
@@ -33,6 +36,8 @@ __all__ = [
     "EdookitClient",
     "EdookitConnectionError",
     "EdookitError",
+    "Grade",
+    "Grades",
     "Lesson",
     "Message",
     "MessageSummary",
@@ -43,6 +48,7 @@ __all__ = [
     "SchoolEvent",
     "Session",
     "SessionExpired",
+    "Subject",
     "Term",
     "TimetableWeek",
     "content_fingerprint",

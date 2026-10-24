@@ -400,3 +400,56 @@ async def test_inbox_is_no_longer_a_capture_page():
 
     with pytest.raises(ValueError):
         await client.fetch_page("inbox")
+
+
+LISTING_URL = f"https://{SCHOOL}.edookit.net/evaluation/listing"
+SUBJECTS_URL = f"https://{SCHOOL}.edookit.net/evaluation/"
+OVERALL_URL = f"https://{SCHOOL}.edookit.net/evaluation/overall"
+LISTING = (FIXTURES / "evaluation_listing_structure.html").read_text()
+SUBJECTS = (FIXTURES / "evaluation_subjects_structure.html").read_text()
+
+
+def _grades_session(seen: list[dict] | None = None) -> FakeClientSession:
+    # The listing route comes first: the subjects URL is a prefix of it.
+    if seen is None:
+        return FakeClientSession(
+            [
+                ("GET", LISTING_URL, ok(LISTING_URL, body=LISTING)),
+                ("GET", SUBJECTS_URL, ok(SUBJECTS_URL, body=SUBJECTS)),
+            ]
+        )
+    return FakeClientSession(
+        [
+            ("GET", LISTING_URL, _recording(seen, LISTING, LISTING_URL)),
+            ("GET", SUBJECTS_URL, _recording(seen, SUBJECTS, SUBJECTS_URL)),
+        ]
+    )
+
+
+@pytest.mark.asyncio
+async def test_get_grades_combines_both_pages():
+    grades = await EdookitClient(SESSION, http=_grades_session()).get_grades()
+
+    assert grades.term == "1. pololetí 26/27"
+    assert [g.id for g in grades.grades] == [9102, 9101, 9100, 9099]
+    assert [s.course_id for s in grades.subjects] == [501, 502, 503]
+    assert grades.subjects[0].attendance_percent == 100.0
+
+
+@pytest.mark.asyncio
+async def test_grades_pages_are_fetched_without_the_ajax_headers():
+    seen: list[dict] = []
+
+    await EdookitClient(SESSION, http=_grades_session(seen)).get_grades()
+
+    assert len(seen) == 2
+    for headers in seen:
+        assert "X-Requested-With" not in headers
+        assert "X-CSRF-Token" not in headers
+
+
+@pytest.mark.asyncio
+async def test_overall_evaluation_is_a_capture_page():
+    fake = FakeClientSession([("GET", OVERALL_URL, ok(OVERALL_URL, body="<p>x</p>"))])
+
+    assert await EdookitClient(SESSION, http=fake).fetch_page("evaluation_overall") == "<p>x</p>"
