@@ -9,8 +9,18 @@ import aiohttp
 
 from . import auth, transport
 from .exceptions import ParseError, SessionExpired
-from .models import Lesson, Message, MessageSummary, Payments, SchoolEvent, Term, TimetableWeek
+from .models import (
+    Grades,
+    Lesson,
+    Message,
+    MessageSummary,
+    Payments,
+    SchoolEvent,
+    Term,
+    TimetableWeek,
+)
 from .parsers.events import parse_events
+from .parsers.grades import parse_grade_listing, parse_subjects
 from .parsers.inbox import parse_inbox
 from .parsers.message import parse_message
 from .parsers.payments import parse_payments
@@ -24,11 +34,15 @@ _EVENTS_PATH = "/timetable/upcoming"
 _PAYMENTS_PATH = "/payments/"
 _INBOX_PATH = "/overview/updates"
 _MESSAGE_PATH = "/messages/detail"
+_GRADES_PATH = "/evaluation/listing"
+_SUBJECTS_PATH = "/evaluation/"
 
 CAPTURE_PAGES: dict[str, str] = {
     "assignments": "/assignments/",
     "exams": "/exams/",
     "consents": "/consents/",
+    # Term marks (orange on the portal) have no known markup until published.
+    "evaluation_overall": "/evaluation/overall",
 }
 
 
@@ -43,6 +57,11 @@ def _parse_week(html: str) -> TimetableWeek:
             raise
         lessons = []
     return TimetableWeek(lessons, periods)
+
+
+def _parse_grades(listing: str, subjects: str) -> Grades:
+    term, grades = parse_grade_listing(listing)
+    return Grades(term, grades, parse_subjects(subjects, term))
 
 
 class EdookitClient:
@@ -104,6 +123,13 @@ class EdookitClient:
 
     async def get_inbox(self) -> list[MessageSummary]:
         return await asyncio.to_thread(parse_inbox, await self._get(_INBOX_PATH, ajax=False))
+
+    async def get_grades(self) -> Grades:
+        """The current term's grades and the subjects with their attendance."""
+        listing, subjects = await asyncio.gather(
+            self._get(_GRADES_PATH, ajax=False), self._get(_SUBJECTS_PATH, ajax=False)
+        )
+        return await asyncio.to_thread(_parse_grades, listing, subjects)
 
     async def get_message(self, message_id: int) -> Message:
         """One message in full; fetching it marks the message read on the portal."""

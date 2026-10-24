@@ -9,6 +9,7 @@ from bs4.element import NavigableString
 from ..exceptions import ParseError
 from ..models import PORTAL_TZ, BodyNode, Message
 from .dates import TIME_RE, find_days, portal_today
+from .text import tag_text as _text
 
 # The body is HTML written by school staff on a third-party site and ends up
 # in the Home Assistant frontend, so only this allowlist survives; everything
@@ -98,10 +99,6 @@ def _rows(table: Tag) -> dict[str, Tag]:
         if label is not None and value is not None:
             rows.setdefault(label.get_text(strip=True), value)
     return rows
-
-
-def _text(tag: Tag | None) -> str:
-    return " ".join(tag.get_text(" ", strip=True).split()) if tag else ""
 
 
 def _sent(value: Tag | None) -> datetime | None:

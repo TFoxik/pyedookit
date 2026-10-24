@@ -44,9 +44,10 @@ asyncio.run(main())
 | `get_payments()` | `Payments` totals and requests, amounts as `Decimal` |
 | `get_inbox()` | the `MessageSummary`s in Schránka, newest first: subject, sender, sent time, preview, `unread` |
 | `get_message(id)` | one `Message` in full; fetching it marks the message read on the portal |
+| `get_grades()` | `Grades` of the current term: `grades` newest first (mark, weight, topic, teacher, entered date), `subjects` with attendance, and `average(course_id)`, weighted |
 | `fetch_page(name)` | raw HTML of a page without a parser yet (`CAPTURE_PAGES`) |
 
-The inbox and message pages are requested the way a browser's first page
+The inbox, message and grades pages are requested the way a browser's first page
 load is, without the AJAX headers the other calls send: to an AJAX request
 the portal answers with the inbox's first-run guide and its sample items.
 `Message.body` is the message's HTML reduced to a JSON-ready node tree of
@@ -95,6 +96,10 @@ hand, and a real jar would resend them.
   one yet, so `Lesson.is_changed` and `is_cancelled` are always `False`.
 - **Unpaid payment requests are unverified.** Only paid ones have been seen.
   A request without the "accepted" marker is reported as unpaid.
+- **Grades: term marks and non-numeric marks are unverified.** Neither has
+  been seen. A mark other than 1–5 is kept as text and left out of
+  `average()`; the current term is chosen by its heading ("2. pololetí" over
+  "1. pololetí").
 
 ## Development
 

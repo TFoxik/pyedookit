@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<!-- Structure of /evaluation/listing from a real capture (2026-10-24), with
+     invented names, topics and ids. The noCourse row (9099) is a guess: no
+     grade without a subject has been seen yet. -->
+<html lang="cs">
+<head><meta charset="utf-8"><title>Výpis hodnocení</title></head>
+<body>
+<a href="/user/logout">Odhlásit</a>
+<section class="content">
+    <h2>Výpis hodnocení</h2>
+    <div class="page-help">Výpis hodnocení seřazený podle data hodnocení (nejnovější nahoře).</div>
+    <script type="text/javascript">
+    function showAll() { highlight(document.getElementById('filterAll')); }
+    </script>
+<div style="margin: 0px 2px" class="table_filters subfilters">
+    <ul>
+        <li class="subfilter otf showAllFilter" id="filterAll" onclick="showAll()">Vše</li>
+        <li class="subfilter otf" id="filter501" title="Aj 2 - I.B" onclick="showCourse(501)">
+            Aj 2 - I.B <em class="objectFilterCounter">(2)</em>
+        </li>
+        <li class="subfilter otf" id="filter502" title="Hudební výchova" onclick="showCourse(502)">
+            Hudební výchova <em class="objectFilterCounter">(1)</em>
+        </li>
+    </ul>
+</div>
+<div id="snippet-evaluationGrid-flashes"></div>
+<div class="boxes1">
+            <h3 class="termHeading">1. pololetí 26/27</h3>
+            <p id="noSuchSelector1" style="display:none"><em>Žádná hodnocení</em></p>
+            <div id="shownSelector1" class="evaluation_table spacy-grid cssHack-no-bg">
+            <div id="gridLabel" class="gridLabel infoHeaderFixed">
+                <ul class="unclickable gridLabel table_row  ">
+                    <li class="c1"><h3 class="grid-label">Předmět a téma</h3></li>
+                    <li class="c2"><h3 class="grid-label">Hodnocení</h3></li>
+                    <li class="c3"><h3 class="grid-label">Vytvořeno</h3></li>
+                </ul>
+            </div>
+                <div class="cssHack-box">
+                <ul class="anyCourse course501 table_row  " onclick="window.location.href = '/evaluation/detail?evaluationId=9102'">
+                    <li class="c1">
+                        <h3 class="responsive-label">Předmět a téma</h3>
+                            <p>
+                                <a href="/courses/detail?courseId=501">Anglický jazyk</a>
+                                <span class="link_info">
+                                    Aj 2 - I.B
+                                </span>
+                            </p>
+                        <div class="bold">
+                            <a  href="/evaluation/detail?evaluationId=9102">
+                                <strong>
+                                    <p>Obecné hodnocení</p>
+                                        <p>Test Unit 1</p>
+                                </strong>
+                            </a>
+                        </div>
+                    </li>
+                    <li class="c2">
+                        <h3 class="responsive-label">Hodnocení</h3>
+                            <p>
+                                <span class="evaluation"><span title="Váha: 1">1</span></span>
+                            </p>
+                    </li>
+                    <li class="c3">
+                        <h3 class="responsive-label">Vytvořeno</h3>
+                        <div class="smaller">
+                            <p><b>Učitelka A</b></p>
+                            <p>St 21.&thinsp;10.&thinsp;2026</p>
+                        </div>
+                            <div><a class="out_link" href="/messages/reply?kind=datatemplate.evaluation&amp;oid=9102">Reagovat</a></div>
+                    </li>
+                </ul>
+                    </div>
+                <div class="cssHack-box">
+                <ul class="anyCourse course501 table_row  " onclick="window.location.href = '/evaluation/detail?evaluationId=9100'">
+                    <li class="c1">
+                        <h3 class="responsive-label">Předmět a téma</h3>
+                            <p>
+                                <a href="/courses/detail?courseId=501">Anglický jazyk</a>
+                                <span class="link_info">
+                                    Aj 2 - I.B
+                                </span>
+                            </p>
+                        <div class="bold">
+                            <a  href="/evaluation/detail?evaluationId=9100">
+                                <strong>
+                                    <p>Obecné hodnocení</p>
+                                        <p>Slovíčka</p>
+                                </strong>
+                            </a>
+                        </div>
+                    </li>
+                    <li class="c2">
+                        <h3 class="responsive-label">Hodnocení</h3>
+                            <p>
+                                <span class="evaluation"><span title="Váha: 2">3</span></span>
+                            </p>
+                    </li>
+                    <li class="c3">
+                        <h3 class="responsive-label">Vytvořeno</h3>
+                        <div class="smaller">
+                            <p><b>Učitelka A</b></p>
+                            <p>Po 19.&thinsp;10.&thinsp;2026</p>
+                        </div>
+                            <div><a class="out_link" href="/messages/reply?kind=datatemplate.evaluation&amp;oid=9100">Reagovat</a></div>
+                    </li>
+                </ul>
+                    </div>
+                <div class="cssHack-box">
+                <ul class="anyCourse course502 table_row  " onclick="window.location.href = '/evaluation/detail?evaluationId=9101'">
+                    <li class="c1">
+                        <h3 class="responsive-label">Předmět a téma</h3>
+                            <p>
+                                <a href="/courses/detail?courseId=502">Hudební výchova</a>
+                                <span class="link_info">
+                                    Hv - I.B
+                                </span>
+                            </p>
+                        <div class="bold">
+                            <a  href="/evaluation/detail?evaluationId=9101">
+                                <strong>
+                                    <p>Obecné hodnocení</p>
+                                        <p>Rytmus</p>
+                                </strong>
+                            </a>
+                        </div>
+                    </li>
+                    <li class="c2">
+                        <h3 class="responsive-label">Hodnocení</h3>
+                            <p>
+                                <span class="evaluation"><span title="Váha: 0,5">2</span></span>
+                            </p>
+                    </li>
+                    <li class="c3">
+                        <h3 class="responsive-label">Vytvořeno</h3>
+                        <div class="smaller">
+                            <p><b>Učitel B</b></p>
+                            <p>Po 19.&thinsp;10.&thinsp;2026</p>
+                        </div>
+                            <div><a class="out_link" href="/messages/reply?kind=datatemplate.evaluation&amp;oid=9101">Reagovat</a></div>
+                    </li>
+                </ul>
+                    </div>
+                <div class="cssHack-box">
+                <ul class="anyCourse noCourse table_row  " onclick="window.location.href = '/evaluation/detail?evaluationId=9099'">
+                    <li class="c1">
+                        <h3 class="responsive-label">Předmět a téma</h3>
+                        <div class="bold">
+                            <a  href="/evaluation/detail?evaluationId=9099">
+                                <strong>
+                                    <p>Ostatní</p>
+                                        <p>Výlet</p>
+                                </strong>
+                            </a>
+                        </div>
+                    </li>
+                    <li class="c2">
+                        <h3 class="responsive-label">Hodnocení</h3>
+                            <p>
+                                <span class="evaluation"><span>A</span></span>
+                            </p>
+                    </li>
+                    <li class="c3">
+                        <h3 class="responsive-label">Vytvořeno</h3>
+                        <div class="smaller">
+                            <p><b>Učitel B</b></p>
+                            <p>Pá 16.&thinsp;10.&thinsp;2026</p>
+                        </div>
+                    </li>
+                </ul>
+                    </div>
+        </div>
+	<div class="cleaner"></div></div>
+</section>
+</body>
+</html>
