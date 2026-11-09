@@ -16,9 +16,7 @@ from .fakes import FailingResponse, FakeClientSession, ok, redirect
 SCHOOL = "zs-example"
 TIMETABLE_URL = f"https://{SCHOOL}.edookit.net/timetable/"
 
-SESSION = Session.from_cookies(
-    SCHOOL, edookit={"PHPSESSID": "s", "uu.app.csrf": "csrf"}, plus4u={}
-)
+SESSION = Session.from_cookies(SCHOOL, edookit={"PHPSESSID": "s", "uu.app.csrf": "csrf"}, plus4u={})
 
 
 EXPIRED = '{"redirect":"https://zs-example.edookit.net/user/login?message=1","state":[]}'
@@ -453,3 +451,27 @@ async def test_overall_evaluation_is_a_capture_page():
     fake = FakeClientSession([("GET", OVERALL_URL, ok(OVERALL_URL, body="<p>x</p>"))])
 
     assert await EdookitClient(SESSION, http=fake).fetch_page("evaluation_overall") == "<p>x</p>"
+
+
+HOMEWORK_URL = f"https://{SCHOOL}.edookit.net/assignments/"
+HOMEWORK = (FIXTURES / "assignments_structure.html").read_text()
+
+
+@pytest.mark.asyncio
+async def test_get_homework_parses_the_assignments_page():
+    fake = FakeClientSession([("GET", HOMEWORK_URL, ok(HOMEWORK_URL, body=HOMEWORK))])
+
+    items = await EdookitClient(SESSION, http=fake).get_homework()
+
+    assert items[0].id == 144002
+
+
+@pytest.mark.asyncio
+async def test_homework_page_is_fetched_without_the_ajax_headers():
+    seen: list[dict] = []
+    fake = FakeClientSession([("GET", HOMEWORK_URL, _recording(seen, HOMEWORK, HOMEWORK_URL))])
+
+    await EdookitClient(SESSION, http=fake).get_homework()
+
+    assert "X-Requested-With" not in seen[0]
+    assert "X-CSRF-Token" not in seen[0]

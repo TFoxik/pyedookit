@@ -7,7 +7,7 @@ from datetime import date, datetime, time
 from bs4 import BeautifulSoup, Tag
 
 from ..exceptions import ParseError
-from ..models import PORTAL_TZ, Lesson, Period, Term
+from ..models import PORTAL_TZ, Lesson, Period, Term, split_course_code
 from .dates import find_days, portal_today
 
 _TIME_RANGE_RE = re.compile(r"(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})")
@@ -121,7 +121,7 @@ def _parse_lesson_info(block: Tag, today: date) -> Lesson | None:
         if note_text.startswith(_NOTE_PREFIX):
             note = note_text[len(_NOTE_PREFIX) :].strip() or None
 
-    code, _, group = code_group.partition(" - ")
+    code, group = split_course_code(code_group)
 
     return Lesson(
         start=datetime.combine(lesson_date, time(sh, sm), tzinfo=PORTAL_TZ),
@@ -129,7 +129,7 @@ def _parse_lesson_info(block: Tag, today: date) -> Lesson | None:
         subject=subject or code_group,
         teacher=teacher or None,
         room=room or None,
-        group=group or None,
+        group=group,
         note=note,
-        code=code.strip() or None,
+        code=code,
     )

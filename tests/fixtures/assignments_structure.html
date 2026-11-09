@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head><title>Úkoly – Školní portál</title></head>
+<body>
+<a href="/user/logout">Odhlásit se</a>
+<section class="content">
+<div class="table_filters subfilters">
+    <ul>
+        <li class="subfilter otf showAllFilter" id="filterAll" onclick="showAll()">
+            Vše
+        </li>
+        <li class="subfilter otf showIncompleteFilter" id="filterIncomplete" onclick="showIncomplete()">
+            Nedokončené <em class="objectFilterCounter">(3)</em>
+        </li>
+        <li class="subfilter otf" id="filter9101" title="Aj 2 - I.B" onclick="showCourse(9101)">
+            Aj 2 - I.B <em class="objectFilterCounter">(1)</em>
+        </li>
+        <li class="subfilter otf" id="filter9102" title="M - I.B" onclick="showCourse(9102)">
+            M - I.B <em class="objectFilterCounter">(1)</em>
+        </li>
+    </ul>
+    <div class="cleaner"></div>
+</div>
+<div class="assignmentsContainer">
+<form action="/assignments/" method="post" id="frm-assignmentsGrid-finishAssignment">
+
+    <h2 class="heading">Úkoly na dnešek</h2>
+
+<div>
+    <div class="boxes1">
+            <p><em>Žádné úkoly</em></p>
+    	<div class="cleaner"></div></div>
+</div>
+
+    <h2 class="heading">Nadcházející úkoly</h2>
+<div>
+    <div class="boxes1">
+                <p id="noSuchSelector1" style="display:none"><em>Žádné úkoly</em></p>
+                <div id="shownSelector1" class="homeworks_table spacy-grid cssHack-no-bg">
+<div id="gridLabel" class="gridLabel cssHack-box">
+    <ul class="unclickable gridLabel table_row  ">
+        <li class="c1"><h3 class="grid-label">Termín odevzdání</h3></li>
+        <li class="c2"><h3 class="grid-label">Popis</h3></li>
+        <li class="c3"><h3 class="grid-label">Postup</h3></li>
+        <li class="c4"><h3 class="grid-label">Vytvořeno</h3></li>
+    </ul>
+</div>
+
+    <div class="cssHack-box">
+    <ul class="anyCourse course9101 incomplete table_row  " onclick="window.location.href = '/assignments/detail?assignment=144001'">
+        <li class="c1">
+            <h3 class="responsive-label">Termín odevzdání</h3>
+            <p><b>do 10.&thinsp;11., <span>9:30</span></b></p>
+            <p>
+                Anglický jazyk<span class="link_info">Aj 2 - I.B</span>
+            </p>
+        </li>
+        <li class="c2">
+            <h3 class="responsive-label">Popis</h3>
+            <p>
+                <div class="bold">
+                <a class="unread" href="/assignments/detail?assignment=144001">
+                    Aj 2 - I.B (Anglický jazyk) - Domácí úkol
+                </a>
+                </div>
+            </p>
+            <p></p>
+            <p>Uč. str. 20 - přečíst.</p>
+        </li>
+        <li class="c3">
+            <h3 class="responsive-label">Postup</h3>
+            0&nbsp;%
+            <label for="frm-assignmentsGrid-finishAssignment-assignments-144001"><input type="checkbox" name="assignments[144001]" class="assignments_checkbox" id="frm-assignmentsGrid-finishAssignment-assignments-144001"></label>
+            <br>
+            <input type="submit" name="assignments[s144001]" class="assignments_submit" value="Označit jako hotové">
+        </li>
+        <li class="c4">
+            <h3 class="responsive-label">Vytvořeno</h3>
+            <div class="smaller">
+                <p><b>Učitelka A</b></p>
+                <p>Út 3.&thinsp;11.&thinsp;2026, <span class="date_time">15:41</span></p>
+            </div>
+        </li>
+    </ul>
+    </div>
+
+    <div class="cssHack-box">
+    <ul class="anyCourse course9101 table_row  " onclick="window.location.href = '/assignments/detail?assignment=144003'">
+        <li class="c1">
+            <h3 class="responsive-label">Termín odevzdání</h3>
+            <p><b>do 13.&thinsp;11.</b></p>
+            <p>
+                Anglický jazyk<span class="link_info">Aj 2 - I.B</span>
+            </p>
+        </li>
+        <li class="c2">
+            <h3 class="responsive-label">Popis</h3>
+            <p>
+                <div class="bold">
+                <a href="/assignments/detail?assignment=144003">
+                    Aj 2 - I.B (Anglický jazyk) - Slovíčka
+                </a>
+                </div>
+            </p>
+            <p></p>
+            <p>Slovíčka lekce 3</p>
+        </li>
+        <li class="c3">
+            <h3 class="responsive-label">Postup</h3>
+            100&nbsp;%
+            <label for="frm-assignmentsGrid-finishAssignment-assignments-144003"><input type="checkbox" name="assignments[144003]" class="assignments_checkbox" id="frm-assignmentsGrid-finishAssignment-assignments-144003"></label>
+        </li>
+        <li class="c4">
+            <h3 class="responsive-label">Vytvořeno</h3>
+            <div class="smaller">
+                <p><b>Učitelka A</b></p>
+                <p>Čt 5.&thinsp;11.&thinsp;2026, <span class="date_time">9:00</span></p>
+            </div>
+        </li>
+    </ul>
+    </div>
+
+    <div class="cssHack-box">
+    <ul class="noCourse incomplete table_row  " onclick="window.location.href = '/assignments/detail?assignment=144004'">
+        <li class="c1">
+            <h3 class="responsive-label">Termín odevzdání</h3>
+            <p><b>do 12.&thinsp;11., <span>12:00</span></b></p>
+        </li>
+        <li class="c2">
+            <h3 class="responsive-label">Popis</h3>
+            <p>
+                <div class="bold">
+                <a href="/assignments/detail?assignment=144004">
+                    Domácí úkol
+                </a>
+                </div>
+            </p>
+            <p></p>
+            <p>Přinést kaštany.</p>
+        </li>
+        <li class="c3">
+            <h3 class="responsive-label">Postup</h3>
+            0&nbsp;%
+            <label for="frm-assignmentsGrid-finishAssignment-assignments-144004"><input type="checkbox" name="assignments[144004]" class="assignments_checkbox" id="frm-assignmentsGrid-finishAssignment-assignments-144004"></label>
+        </li>
+        <li class="c4">
+            <h3 class="responsive-label">Vytvořeno</h3>
+            <div class="smaller">
+                <p><b>Učitel B</b></p>
+                <p>Včera, <span class="date_time">10:00</span></p>
+            </div>
+        </li>
+    </ul>
+    </div>
+                </div>
+    	<div class="cleaner"></div></div>
+</div>
+
+    <h2 class="heading">Nedávné úkoly</h2>
+<div>
+    <div class="boxes1">
+                <p id="noSuchSelector2" style="display:none"><em>Žádné úkoly</em></p>
+                <div id="shownSelector2" class="homeworks_table spacy-grid cssHack-no-bg">
+
+    <div class="cssHack-box">
+    <ul class="anyCourse course9102 incomplete table_row  " onclick="window.location.href = '/assignments/detail?assignment=144002'">
+        <li class="c1">
+            <h3 class="responsive-label">Termín odevzdání</h3>
+            <p><b>do 2.&thinsp;11., <span>8:00</span></b></p>
+            <p>
+                Matematika<span class="link_info">M - I.B</span>
+            </p>
+        </li>
+        <li class="c2">
+            <h3 class="responsive-label">Popis</h3>
+            <p>
+                <div class="bold">
+                <a href="/assignments/detail?assignment=144002">
+                    M - I.B (Matematika) - Domácí úkol
+                </a>
+                </div>
+            </p>
+            <p></p>
+            <p>Pracovní list<br>str. 5</p>
+        </li>
+        <li class="c3">
+            <h3 class="responsive-label">Postup</h3>
+            30&nbsp;%
+            <label for="frm-assignmentsGrid-finishAssignment-assignments-144002"><input type="checkbox" name="assignments[144002]" class="assignments_checkbox" id="frm-assignmentsGrid-finishAssignment-assignments-144002"></label>
+        </li>
+        <li class="c4">
+            <h3 class="responsive-label">Vytvořeno</h3>
+            <div class="smaller">
+                <p><b>Učitel B</b></p>
+                <p>Po 26.&thinsp;10.&thinsp;2026, <span class="date_time">9:00</span></p>
+            </div>
+        </li>
+    </ul>
+    </div>
+                </div>
+    	<div class="cleaner"></div></div>
+</div>
+
+</form>
+</div>
+<p>Všechny minulé úkoly najdete v <a href="/assignments/archive">archivu</a>.</p>
+</section>
+</body>
+</html>

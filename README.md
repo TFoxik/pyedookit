@@ -45,9 +45,10 @@ asyncio.run(main())
 | `get_inbox()` | the `MessageSummary`s in Schránka, newest first: subject, sender, sent time, preview, `unread` |
 | `get_message(id)` | one `Message` in full; fetching it marks the message read on the portal |
 | `get_grades()` | `Grades` of the current term: `grades` newest first (mark, weight, topic, teacher, entered date), `subjects` with attendance, and `average(course_id)`, weighted |
+| `get_homework()` | the `Homework` items of Úkoly (today, upcoming and recent): title, text, deadline in `PORTAL_TZ`, progress, `done`, teacher, subject; soonest deadline first, undated last. Only the list page is read, never an item's detail page |
 | `fetch_page(name)` | raw HTML of a page without a parser yet (`CAPTURE_PAGES`) |
 
-The inbox, message and grades pages are requested the way a browser's first page
+The inbox, message, grades and homework pages are requested the way a browser's first page
 load is, without the AJAX headers the other calls send: to an AJAX request
 the portal answers with the inbox's first-run guide and its sample items.
 `Message.body` is the message's HTML reduced to a JSON-ready node tree of

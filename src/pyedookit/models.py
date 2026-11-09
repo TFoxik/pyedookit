@@ -110,6 +110,12 @@ def _short(code: str | None, name: str | None) -> str | None:
     return code.split()[0] if code and code.strip() else name
 
 
+def split_course_code(text: str) -> tuple[str | None, str | None]:
+    """The portal's "{code} - {group}" label as (code, group): "Aj 2 - I.B" → ("Aj 2", "I.B")."""
+    code, _, group = text.partition(" - ")
+    return code.strip() or None, group.strip() or None
+
+
 @dataclass(frozen=True, slots=True)
 class Grade:
     id: int
@@ -130,6 +136,33 @@ class Grade:
     @property
     def short(self) -> str | None:
         return _short(self.course_code, self.subject)
+
+
+@dataclass(frozen=True, slots=True)
+class Homework:
+    id: int
+    title: str
+    text: str
+    done: bool
+    due: datetime | None = None
+    progress: int | None = None
+    teacher: str | None = None
+    created: datetime | None = None
+    course_id: int | None = None
+    subject: str | None = None
+    course_code: str | None = None
+
+    @property
+    def short(self) -> str | None:
+        return _short(self.course_code, self.subject)
+
+    @property
+    def code(self) -> str | None:
+        return split_course_code(self.course_code or "")[0]
+
+    @property
+    def group(self) -> str | None:
+        return split_course_code(self.course_code or "")[1]
 
 
 @dataclass(frozen=True, slots=True)

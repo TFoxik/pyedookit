@@ -11,6 +11,7 @@ from . import auth, transport
 from .exceptions import ParseError, SessionExpired
 from .models import (
     Grades,
+    Homework,
     Lesson,
     Message,
     MessageSummary,
@@ -21,6 +22,7 @@ from .models import (
 )
 from .parsers.events import parse_events
 from .parsers.grades import parse_grade_listing, parse_subjects
+from .parsers.homework import parse_homework
 from .parsers.inbox import parse_inbox
 from .parsers.message import parse_message
 from .parsers.payments import parse_payments
@@ -36,6 +38,7 @@ _INBOX_PATH = "/overview/updates"
 _MESSAGE_PATH = "/messages/detail"
 _GRADES_PATH = "/evaluation/listing"
 _SUBJECTS_PATH = "/evaluation/"
+_HOMEWORK_PATH = "/assignments/"
 
 CAPTURE_PAGES: dict[str, str] = {
     "assignments": "/assignments/",
@@ -130,6 +133,11 @@ class EdookitClient:
             self._get(_GRADES_PATH, ajax=False), self._get(_SUBJECTS_PATH, ajax=False)
         )
         return await asyncio.to_thread(_parse_grades, listing, subjects)
+
+    async def get_homework(self) -> list[Homework]:
+        """Homework from Úkoly, soonest deadline first."""
+        html = await self._get(_HOMEWORK_PATH, ajax=False)
+        return await asyncio.to_thread(parse_homework, html)
 
     async def get_message(self, message_id: int) -> Message:
         """One message in full; fetching it marks the message read on the portal."""
