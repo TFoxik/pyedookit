@@ -138,19 +138,10 @@ class Grade:
         return _short(self.course_code, self.subject)
 
 
-@dataclass(frozen=True, slots=True)
-class Homework:
-    id: int
-    title: str
-    text: str
-    done: bool
-    due: datetime | None = None
-    progress: int | None = None
-    teacher: str | None = None
-    created: datetime | None = None
-    course_id: int | None = None
-    subject: str | None = None
-    course_code: str | None = None
+class _CourseLabels:
+    __slots__ = ()
+    course_code: str | None
+    subject: str | None
 
     @property
     def short(self) -> str | None:
@@ -163,6 +154,21 @@ class Homework:
     @property
     def group(self) -> str | None:
         return split_course_code(self.course_code or "")[1]
+
+
+@dataclass(frozen=True, slots=True)
+class Homework(_CourseLabels):
+    id: int
+    title: str
+    text: str
+    done: bool
+    due: datetime | None = None
+    progress: int | None = None
+    teacher: str | None = None
+    created: datetime | None = None
+    course_id: int | None = None
+    subject: str | None = None
+    course_code: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
