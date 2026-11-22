@@ -3,7 +3,7 @@
 
 Run this yourself so credentials never enter the assistant's session:
 
-    ! python scripts/capture_fixtures.py <school-subdomain> [--messages] [--evaluation]
+    ! python scripts/capture_fixtures.py <school-subdomain> [--messages] [--evaluation] [--exams]
 
 It first discovers this school's Plus4U client_id (scraped from its own
 /user/login page - it's per-school, not shared) without needing a password,
@@ -15,6 +15,7 @@ don't end up in shell history), logs in, and saves:
   captures/inbox.html
   captures/message_<id>.html  (every message in the inbox; only with --messages)
   captures/evaluation_<page>.html  (the grades pages; only with --evaluation)
+  captures/exams.html  (Písemky, zkoušení; only with --exams)
 
 Fetching a message page marks that message read on the portal, so --messages
 marks every unread message read.
@@ -56,9 +57,12 @@ async def main() -> None:
     with_evaluation = "--evaluation" in args
     if with_evaluation:
         args.remove("--evaluation")
+    with_exams = "--exams" in args
+    if with_exams:
+        args.remove("--exams")
     if len(args) != 1:
         print(
-            "usage: capture_fixtures.py <school-subdomain> [--messages] [--evaluation]",
+            "usage: capture_fixtures.py <school-subdomain> [--messages] [--evaluation] [--exams]",
             file=sys.stderr,
         )
         raise SystemExit(2)
@@ -92,6 +96,8 @@ async def main() -> None:
         for page in EVALUATION_PAGES:
             html = await client._get(f"/evaluation/{page}", ajax=False)
             save(f"evaluation_{page or 'index'}.html", html)
+    if with_exams:
+        save("exams.html", await client._get("/exams/", ajax=False))
 
     print()
     print(f"Files were saved to {CAPTURES_DIR}/ (gitignored) rather than tests/fixtures/,")

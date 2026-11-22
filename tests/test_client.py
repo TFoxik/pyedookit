@@ -475,3 +475,29 @@ async def test_homework_page_is_fetched_without_the_ajax_headers():
 
     assert "X-Requested-With" not in seen[0]
     assert "X-CSRF-Token" not in seen[0]
+
+
+EXAMS_URL = f"https://{SCHOOL}.edookit.net/exams/"
+
+
+EXAMS = (FIXTURES / "exams_structure.html").read_text()
+
+
+@pytest.mark.asyncio
+async def test_get_exams_parses_the_exams_page():
+    fake = FakeClientSession([("GET", EXAMS_URL, ok(EXAMS_URL, body=EXAMS))])
+
+    exams = await EdookitClient(SESSION, http=fake).get_exams()
+
+    assert exams[0].id == 9101
+
+
+@pytest.mark.asyncio
+async def test_exams_page_is_fetched_without_the_ajax_headers():
+    seen: list[dict] = []
+    fake = FakeClientSession([("GET", EXAMS_URL, _recording(seen, EXAMS, EXAMS_URL))])
+
+    await EdookitClient(SESSION, http=fake).get_exams()
+
+    assert "X-Requested-With" not in seen[0]
+    assert "X-CSRF-Token" not in seen[0]
