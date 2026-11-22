@@ -10,6 +10,7 @@ import aiohttp
 from . import auth, transport
 from .exceptions import ParseError, SessionExpired
 from .models import (
+    Exam,
     Grades,
     Homework,
     Lesson,
@@ -21,6 +22,7 @@ from .models import (
     TimetableWeek,
 )
 from .parsers.events import parse_events
+from .parsers.exams import parse_exams
 from .parsers.grades import parse_grade_listing, parse_subjects
 from .parsers.homework import parse_homework
 from .parsers.inbox import parse_inbox
@@ -39,9 +41,11 @@ _MESSAGE_PATH = "/messages/detail"
 _GRADES_PATH = "/evaluation/listing"
 _SUBJECTS_PATH = "/evaluation/"
 _HOMEWORK_PATH = "/assignments/"
+_EXAMS_PATH = "/exams/"
 
 CAPTURE_PAGES: dict[str, str] = {
     "assignments": "/assignments/",
+    # Rows not yet seen on a real account; parsed by get_exams.
     "exams": "/exams/",
     "consents": "/consents/",
     # Term marks (orange on the portal) have no known markup until published.
@@ -138,6 +142,11 @@ class EdookitClient:
         """Homework from Úkoly, soonest deadline first."""
         html = await self._get(_HOMEWORK_PATH, ajax=False)
         return await asyncio.to_thread(parse_homework, html)
+
+    async def get_exams(self) -> list[Exam]:
+        """Upcoming, today's and recent exams from Písemky, zkoušení, soonest first."""
+        html = await self._get(_EXAMS_PATH, ajax=False)
+        return await asyncio.to_thread(parse_exams, html)
 
     async def get_message(self, message_id: int) -> Message:
         """One message in full; fetching it marks the message read on the portal."""

@@ -46,9 +46,10 @@ asyncio.run(main())
 | `get_message(id)` | one `Message` in full; fetching it marks the message read on the portal |
 | `get_grades()` | `Grades` of the current term: `grades` newest first (mark, weight, topic, teacher, entered date), `subjects` with attendance, and `average(course_id)`, weighted |
 | `get_homework()` | the `Homework` items of Úkoly (today, upcoming and recent): title, text, deadline in `PORTAL_TZ`, progress, `done`, teacher, subject; soonest deadline first, undated last. Only the list page is read, never an item's detail page |
+| `get_exams()` | the `Exam`s on Písemky, zkoušení (upcoming, today's and recent), soonest first: title, start and end in `PORTAL_TZ`, kind ("Malá písemka"), subject, teacher, when it was announced, description |
 | `fetch_page(name)` | raw HTML of a page without a parser yet (`CAPTURE_PAGES`) |
 
-The inbox, message, grades and homework pages are requested the way a browser's first page
+The inbox, message, grades, homework and exams pages are requested the way a browser's first page
 load is, without the AJAX headers the other calls send: to an AJAX request
 the portal answers with the inbox's first-run guide and its sample items.
 `Message.body` is the message's HTML reduced to a JSON-ready node tree of
@@ -101,6 +102,10 @@ hand, and a real jar would resend them.
   been seen. A mark other than 1–5 is kept as text and left out of
   `average()`; the current term is chosen by its heading ("2. pololetí" over
   "1. pololetí").
+- **Exams: only the main page is read, and exam rows are unverified.** Older
+  exams are only in the portal's archive, which isn't fetched. The one real
+  capture had no exams; rows are parsed by the shape another account's
+  capture showed.
 
 ## Development
 

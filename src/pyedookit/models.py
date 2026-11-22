@@ -172,6 +172,21 @@ class Homework(_CourseLabels):
 
 
 @dataclass(frozen=True, slots=True)
+class Exam(_CourseLabels):
+    id: int
+    title: str
+    start: datetime
+    end: datetime
+    subject: str | None = None
+    course_code: str | None = None
+    course_id: int | None = None
+    kind: str | None = None
+    teacher: str | None = None
+    announced: datetime | None = None
+    description: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class Subject:
     course_id: int
     name: str
