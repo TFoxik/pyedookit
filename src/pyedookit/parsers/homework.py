@@ -27,8 +27,9 @@ def parse_homework(html: str, today: date | None = None) -> list[Homework]:
     """Homework from Úkoly (`/assignments/`): the sections for today, upcoming
     and recent, merged, soonest deadline first, undated last."""
     soup = BeautifulSoup(html, "lxml")
-    if soup.select_one("#filterIncomplete") is None or soup.select_one("h2.heading") is None:
-        raise ParseError("assignments page has neither the filter nor the section headings")
+    # Not the filter list: the portal leaves it out when nothing is due today or upcoming.
+    if soup.select_one("h2.heading") is None:
+        raise ParseError("assignments page has no section headings")
     if today is None:
         today = portal_today()
     rows = soup.select("ul.table_row:not(.gridLabel)")

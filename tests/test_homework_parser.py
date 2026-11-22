@@ -144,6 +144,14 @@ def test_empty_page_is_an_empty_list():
     assert parse_homework(_without_rows(PAGE), TODAY) == []
 
 
+def test_page_without_the_filter_list_still_parses():
+    page = re.sub(
+        r'<div class="table_filters subfilters">.*?</div>\s*</div>', "", PAGE, flags=re.DOTALL
+    )
+    assert "filterIncomplete" not in page
+    assert [h.id for h in parse_homework(page, TODAY)] == [144002, 144001, 144004, 144003]
+
+
 def test_page_without_anchors_is_a_parse_error():
     with pytest.raises(ParseError):
         parse_homework("<html><body><a href='/user/logout'>x</a></body></html>", TODAY)
